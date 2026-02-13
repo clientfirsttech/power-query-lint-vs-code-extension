@@ -119,8 +119,10 @@ async function installOrUpdateAgent(context: vscode.ExtensionContext): Promise<v
 export function activate(context: vscode.ExtensionContext) {
   console.log('Power Query Lint extension is now active');
 
-  // Install or update the pq-lint-checker agent
-  installOrUpdateAgent(context);
+  // Install or update the pq-lint-checker agent (async, non-blocking)
+  installOrUpdateAgent(context).catch(error => {
+    console.error('Failed to install/update agent during activation:', error);
+  });
 
   // Register lint document command
   const lintDocumentCommand = vscode.commands.registerCommand(
