@@ -15,6 +15,11 @@ All notable changes to the "power-query-lint" extension will be documented in th
 - VS Code debug configuration
 - Comprehensive documentation and setup instructions
 
+### Security
+- Updated @modelcontextprotocol/sdk to version 1.25.2 to address:
+  - ReDoS vulnerability (CVE addressed in 1.25.2)
+  - DNS rebinding protection not enabled by default (CVE addressed in 1.24.0)
+
 ### Features
 - Language support for Power Query with syntax highlighting configuration
 - MCP server for AI agent integration
