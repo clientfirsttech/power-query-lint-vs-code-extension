@@ -1,0 +1,90 @@
+{
+  "name": "power-query-lint",
+  "displayName": "Power Query Lint",
+  "description": "Visual Studio Code Extension for Power Query Lint with MCP server support",
+  "version": "0.0.1",
+  "publisher": "clientfirsttech",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "power-query",
+    "lint",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "activationEvents": [
+    "onLanguage:powerquery"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "powerquery-lint.lint",
+        "title": "Power Query: Lint Document"
+      },
+      {
+        "command": "powerquery-lint.lintWorkspace",
+        "title": "Power Query: Lint Workspace"
+      }
+    ],
+    "languages": [
+      {
+        "id": "powerquery",
+        "aliases": [
+          "Power Query",
+          "powerquery"
+        ],
+        "extensions": [
+          ".pq",
+          ".pqm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "title": "Power Query Lint",
+      "properties": {
+        "powerQueryLint.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable Power Query linting"
+        },
+        "powerQueryLint.mcpServer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable MCP server for AI agent integration"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clientfirsttech/power-query-lint-vs-code-extension.git"
+  },
+  "license": "MIT"
+}
