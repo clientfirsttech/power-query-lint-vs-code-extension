@@ -8,6 +8,7 @@ Visual Studio Code Extension for Power Query linting and analysis with Model Con
 - 🤖 MCP server integration for AI agent support
 - ⚡ Real-time syntax validation
 - 📝 Language support for Power Query
+- 🤖 **Automatic agent installation**: The extension automatically installs the `pq-lint-checker` agent to `~/.github/agents/` when activated, enabling AI-powered Power Query linting and fixing capabilities
 
 ## Installation
 
@@ -118,6 +119,54 @@ To use the MCP server with Claude Desktop or other MCP-compatible clients:
    ```
 
 3. Restart your MCP client
+
+## pq-lint-checker Agent
+
+This extension automatically installs the `pq-lint-checker` agent when activated. The agent is a specialized AI assistant for Power Query and TMDL code linting and fixing.
+
+### Agent Installation
+
+- **Location**: `~/.github/agents/pq-lint-checker.md`
+- **Automatic**: Installed on extension activation
+- **Idempotent**: Only updates when agent content changes
+- **Update mechanism**: Automatically updates when the extension is updated
+
+### Agent Capabilities
+
+The `pq-lint-checker` agent provides:
+
+1. **Linting**: Analyze Power Query M and TMDL code for:
+   - Syntax errors
+   - Anti-patterns and code smells
+   - Performance issues
+   - Naming convention violations
+
+2. **Fixing**: Automatically fix common issues:
+   - Code formatting (indentation, line breaks)
+   - Variable naming to follow PascalCase convention
+   - Simple refactoring
+   - Unused code removal
+
+3. **Analysis**: Deep code structure analysis:
+   - Performance bottleneck identification
+   - Refactoring opportunities
+   - Data flow and dependency analysis
+   - Error handling pattern review
+
+4. **Explanation**: Provide clear explanations of:
+   - Code functionality
+   - Error messages
+   - Best practices
+   - Learning resources
+
+### Using the Agent
+
+The agent integrates with:
+- GitHub Copilot Chat in VS Code
+- Claude Desktop with MCP support
+- Other MCP-compatible AI clients
+
+Simply ask your AI assistant to "lint my Power Query code" or "fix naming conventions in this Power Query file" and the agent will provide specialized assistance.
 
 ## Extension Settings
 
