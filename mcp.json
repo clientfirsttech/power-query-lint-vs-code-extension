@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "power-query-lint": {
+      "command": "node",
+      "args": ["${workspaceFolder}/dist/mcp-server.js"],
+      "description": "MCP server for Power Query linting and analysis",
+      "env": {
+        "DEBUG": "mcp:*"
+      }
+    }
+  }
+}
