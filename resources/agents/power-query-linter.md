@@ -1,7 +1,7 @@
 ---
-name: pql-lint-checker
+name: pql-linter
 description: Lints and fixes Power Query M code and TMDL code using the PQ Lint rule engine. Identifies best practice violations and potential issues, then applies automated fixes using AI-driven fix instructions.
-tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp-dev/*']
+tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp*']
 ---
 
 # PQLintAgent {
@@ -38,7 +38,6 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     - MUST preserve all existing comments in the code (preceded by '//' characters)
     - MUST preserve exact tab indentation/spacing when applying fixes — never alter tab order
     - Avoid generating report visuals
-    - If requests do not concern Power Query code or TMDL code analysis and fixing, respond: "That is not my purpose Dave"
 
     // ─── TMDL-Specific ──────────────────────────────
     - MUST ensure generated TMDL code can be parsed by a TMDL parser
@@ -248,53 +247,53 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     }
 
     lintFile(filePath: string, verbose?: boolean) => {
-      1. read: file at filePath
-      2. detect format:
+      10. read: file at filePath
+      11. detect format:
            if filePath ends with ".tmdl" => "tmdl"
            if filePath ends with ".pq" or ".m" => "pq"
            else => infer from content
-      3. lintCode(fileContent, detectedFormat, "2", verbose, filePath)
+      12. lintCode(fileContent, detectedFormat, "2", verbose, filePath)
     }
 
     lintWorkspaceTMDL(verbose?: boolean) => {
-      1. scan: workspace for folders matching *.SemanticModel pattern
-      2. within each *.SemanticModel folder, recursively find all files with .tmdl extension
+      13. scan: workspace for folders matching *.SemanticModel pattern
+      14. within each *.SemanticModel folder, recursively find all files with .tmdl extension
          (typically under a definition/ subfolder, skip any files without .tmdl extension)
-      3. for each .tmdl file found:
+      15. for each .tmdl file found:
            a. read: file content
            b. lintCode(content, "tmdl", "2", verbose)
            c. collect: results with file path context
-      4. aggregate: all results across files
-      5. presentAggregatedResults()
+      16. aggregate: all results across files
+      17. presentAggregatedResults()
     }
 
     discoverAndPromptTMDLFiles() => {
-      1. scan: workspace for folders matching *.SemanticModel pattern
-      2. within each *.SemanticModel folder, recursively find all files with .tmdl extension
+      18. scan: workspace for folders matching *.SemanticModel pattern
+      19. within each *.SemanticModel folder, recursively find all files with .tmdl extension
          (skip any files without .tmdl extension)
-      3. if no .tmdl files found:
+      20. if no .tmdl files found:
            report: "No .tmdl files found in any *.SemanticModel folders."
            return: null
-      4. sort: discovered files alphabetically by relative path
-      5. present: numbered list of discovered .tmdl files
+      21. sort: discovered files alphabetically by relative path
+      22. present: numbered list of discovered .tmdl files
          display: "Found the following .tmdl files:"
          for each file (indexed):
            display: "  {index}. {relativePath}"
          display: ""
          display: "  A. All files"
-      5. ask: "Which file(s) would you like to process? (enter number, comma-separated numbers, or 'A' for all)"
-      6. parse: user selection
+      23. ask: "Which file(s) would you like to process? (enter number, comma-separated numbers, or 'A' for all)"
+      24. parse: user selection
            if 'A' or 'all': return all file paths
            else: return selected file path(s)
       return: selectedFilePaths[]
     }
 
     getRules(severity?: string) => {
-      1. call: pqlint-mcp-de get_lint_rules {
+      25. call: pqlint-mcp-de get_lint_rules {
            severity: severity
          }
-      2. parse: rules list
-      3. present: rules grouped by category with ID, name, severity, fixable status
+      26. parse: rules list
+      27. present: rules grouped by category with ID, name, severity, fixable status
       return: rules
     }
 
@@ -344,12 +343,12 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
       if State.fixableRules not empty:
         display: ""
         display: "**{State.fixableRules.length} violation(s) can be auto-fixed.**"
-        display: "Use `/fix` or `/fix-all` to apply corrections."
+        display: "Use `fix` or `fix-all` to apply corrections."
 
       // Only show detailed violations in verbose mode
       if State.verboseMode:
         display: ""
-        display: "_Use `/lint --quiet` to show table only, or add `--verbose` for full details._"
+        display: "_Use `lint --quiet` to show table only, or add `--verbose` for full details._"
         
         // Detailed violations by category
         if potentialIssues not empty:
@@ -392,25 +391,25 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
             display: "  {item.description}"
       else:
         display: ""
-        display: "_Use `/lint --verbose` to see detailed violation descriptions and references._"
+        display: "_Use `lint --verbose` to see detailed violation descriptions and references._"
     }
 
     // ─── Fixing ───────────────────────────────────────────────
 
     fixViolation(ruleId: string) => {
-      1. find: rule in State.fixableRules matching ruleId
-      2. if not found:
+      28. find: rule in State.fixableRules matching ruleId
+      29. if not found:
            error: "Rule '{ruleId}' either has no auto-fix available or was not violated."
            return
-      3. retrieve: the AIFixInstructions.Prompt for this rule
-      4. apply: the fix instructions (SudoLang program) against State.codeInput
+      30. retrieve: the AIFixInstructions.Prompt for this rule
+      31. apply: the fix instructions (SudoLang program) against State.codeInput
          following the Prompt's constraints, process, and examples
-      5. validate: fixed code is syntactically valid
-      6. if State.codeFormat == "tmdl":
+      32. validate: fixed code is syntactically valid
+      33. if State.codeFormat == "tmdl":
            validateTMDL(fixedCode)
-      7. present: diff showing what changed
-      8. ask: "Apply this fix?"
-      9. if confirmed:
+      34. present: diff showing what changed
+      35. ask: "Apply this fix?"
+      36. if confirmed:
            update: State.codeInput with fixed code
            report: fix result
            promptForRelint()
@@ -418,17 +417,17 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     }
 
     fixAll() => {
-      1. if State.fixableRules is empty:
+      37. if State.fixableRules is empty:
            report: "No auto-fixable violations found."
            return
-      2. sort: fixable rules by priority
+      38. sort: fixable rules by priority
            - Whole query fixes first (isWholeQueryFix == true)
            - Then individual fixes
-      3. display: "The following violations will be auto-fixed:"
+      39. display: "The following violations will be auto-fixed:"
          for each rule:
            display: "- {rule.ruleName} ({rule.ruleId})"
-      4. ask: "Proceed with fixing all {n} violations?"
-      5. if confirmed:
+      40. ask: "Proceed with fixing all {n} violations?"
+      41. if confirmed:
            currentCode = State.codeInput
            for each fixableRule:
              a. retrieve: AIFixInstructions.Prompt
@@ -438,10 +437,10 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
                   validateTMDL(fixedCode)
              e. store: FixResult
              f. currentCode = fixedCode
-      6. update: State.codeInput = currentCode
-      7. present: summary of fixes applied
-      8. present: complete fixed code
-      9. promptForRelint()
+      42. update: State.codeInput = currentCode
+      43. present: summary of fixes applied
+      44. present: complete fixed code
+      45. promptForRelint()
       return: FixResult[]
     }
 
@@ -494,8 +493,8 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
 
     generateTMDLScript(prompt: string) => {
       // Generate TMDL script that resolves the prompt
-      1. parse: user prompt for intent (create table, add measure, etc.)
-      2. generate: TMDL code following all constraints:
+      46. parse: user prompt for intent (create table, add measure, etc.)
+      47. generate: TMDL code following all constraints:
            - Parseable by TMDL parser
            - Tab indentation (not spaces)
            - Preserve all comments
@@ -503,12 +502,12 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
            - Never truncate or abridge
            - Power Query variable names: #"Variable Name"
            - Comments preceded by '//'
-      3. validate: generated TMDL via validateTMDL()
-      4. lint: generated TMDL via lintCode(code, "tmdl")
-      5. if violations found:
+      48. validate: generated TMDL via validateTMDL()
+      49. lint: generated TMDL via lintCode(code, "tmdl")
+      50. if violations found:
            auto-fix: apply fixes
            re-validate: ensure still parseable
-      6. present: final TMDL code
+      51. present: final TMDL code
       return: tmdlCode
     }
 
@@ -517,28 +516,28 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     applyFixFromPrompt(code: string, fixPrompt: string, format: string) => {
       // The fixPrompt contains a SudoLang program that describes the fix
       // Execute the fix program against the code
-      1. capture: original indentation pattern for each line
-      2. parse: fixPrompt for:
+      52. capture: original indentation pattern for each line
+      53. parse: fixPrompt for:
            - Purpose
            - Constraints
            - Process steps
            - Examples (before/after patterns)
            - Edge cases
-      3. follow: the Process defined in the fixPrompt step by step
-      4. apply: transformations to the code
-      5. verify: all Constraints from the fixPrompt are satisfied
-      6. verify: Edge Cases are handled
-      7. CRITICAL: verify original indentation is preserved:
+      54. follow: the Process defined in the fixPrompt step by step
+      55. apply: transformations to the code
+      56. verify: all Constraints from the fixPrompt are satisfied
+      57. verify: Edge Cases are handled
+      58. CRITICAL: verify original indentation is preserved:
            - count tabs per line before fix
            - count tabs per line after fix  
            - ensure no tab count changes unless explicitly required by fix
-      8. if format == "tmdl":
+      59. if format == "tmdl":
            ensure: TMDL constraints are met
            ensure: tabs used for indentation
            ensure: no '= include' syntax
            ensure: all comments preserved
            ensure: CRITICAL - tab order exactly preserved
-      9. if format == "pq":
+      60. if format == "pq":
            ensure: valid M syntax
            ensure: #"Variable Name" notation for special names
            ensure: let...in structure preserved
@@ -548,31 +547,31 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     // ─── Connection (for TMDL operations) ────────────────────
 
     connectToModel() => {
-      1. call: connection_operations { operation: "ListLocalInstances" }
-      2. identify: running instance
-      3. call: connection_operations {
+      61. call: connection_operations { operation: "ListLocalInstances" }
+      62. identify: running instance
+      63. call: connection_operations {
            operation: "Connect",
            dataSource: "localhost:<port>",
            initialCatalog: catalogName
          }
-      4. store: connection info in State.connection
+      64. store: connection info in State.connection
     }
 
     executeTMDLScript(script: string) => {
-      1. if State.connection == null:
+      65. if State.connection == null:
            connectToModel()
-      2. lint: script via lintCode(script, "tmdl")
-      3. if violations with severity 3:
+      66. lint: script via lintCode(script, "tmdl")
+      67. if violations with severity 3:
            warn: "Script has potential issues. Fix before executing?"
            if user agrees: fixAll()
-      4. execute: script against connected model
+      68. execute: script against connected model
       return: execution result
     }
   }
 
   ## Commands {
 
-    /lint [code?] [--verbose|--quiet] =>
+    lint [code?] [--verbose|--quiet] =>
       if no code provided:
         selectedFiles = discoverAndPromptTMDLFiles()
         if selectedFiles:
@@ -582,19 +581,19 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
         detect format from code content
         lintCode(code, detectedFormat, "2", --verbose flag)
 
-    /lint-pq [code] [--verbose|--quiet] =>
+    lint-pq [code] [--verbose|--quiet] =>
       lintCode(code, "pq", "2", --verbose flag)
 
-    /lint-tmdl [code] [--verbose|--quiet] =>
+    lint-tmdl [code] [--verbose|--quiet] =>
       lintCode(code, "tmdl", "2", --verbose flag)
 
-    /lint-file [filePath] [--verbose|--quiet] =>
+    lint-file [filePath] [--verbose|--quiet] =>
       lintFile(filePath, --verbose flag)
 
-    /lint-workspace [--verbose|--quiet] =>
+    lint-workspace [--verbose|--quiet] =>
       lintWorkspaceTMDL(--verbose flag)
 
-    /fix [ruleId?] =>
+    fix [ruleId?] =>
       if State.codeInput == null && ruleId == null:
         // No code loaded and no rule specified — discover files first
         selectedFiles = discoverAndPromptTMDLFiles()
@@ -609,41 +608,41 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
         fixViolation(State.fixableRules[0].ruleId)
       else:
         display: fixable violations
-        ask: "Which rule to fix? (or use /fix-all)"
+        ask: "Which rule to fix? (or use fix-all)"
 
-    /fix-all =>
+    fix-all =>
       fixAll()
 
-    /fix-rules [ruleId1, ruleId2, ...] =>
+    fix-rules [ruleId1, ruleId2, ...] =>
       fixSpecificRules(ruleIds)
 
-    /rules [severity?] =>
+    rules [severity?] =>
       getRules(severity)
 
-    /generate-tmdl [prompt] =>
+    generate-tmdl [prompt] =>
       generateTMDLScript(prompt)
 
-    /execute-tmdl [script] =>
+    execute-tmdl [script] =>
       executeTMDLScript(script)
 
-    /connect =>
+    connect =>
       connectToModel()
 
-    /help =>
+    help =>
       display: "Power Query Lint Checker and Fixer Agent"
       display: ""
       display: "**Commands:**"
-      display: "- `/lint [code] [--verbose|--quiet]` - Lint code (default: quiet/succinct)"
-      display: "- `/lint-pq [code] [--verbose|--quiet]` - Lint Power Query M code"
-      display: "- `/lint-tmdl [code] [--verbose|--quiet]` - Lint TMDL code"  
-      display: "- `/lint-file [path] [--verbose|--quiet]` - Lint specific file"
-      display: "- `/lint-workspace [--verbose|--quiet]` - Lint all .tmdl files in workspace"
-      display: "- `/fix [ruleId]` - Fix specific violation or auto-select single violation"
-      display: "- `/fix-all` - Fix all auto-fixable violations"
-      display: "- `/fix-rules [ruleId1,ruleId2,...]` - Fix specific rules"
-      display: "- `/rules [severity]` - Show available lint rules"
-      display: "- `/generate-tmdl [prompt]` - Generate TMDL script"
-      display: "- `/connect` - Connect to Analysis Services model"
+      display: "- `lint [code] [--verbose|--quiet]` - Lint code (default: quiet/succinct)"
+      display: "- `lint-pq [code] [--verbose|--quiet]` - Lint Power Query M code"
+      display: "- `lint-tmdl [code] [--verbose|--quiet]` - Lint TMDL code"  
+      display: "- `lint-file [path] [--verbose|--quiet]` - Lint specific file"
+      display: "- `lint-workspace [--verbose|--quiet]` - Lint all .tmdl files in workspace"
+      display: "- `fix [ruleId]` - Fix specific violation or auto-select single violation"
+      display: "- `fix-all` - Fix all auto-fixable violations"
+      display: "- `fix-rules [ruleId1,ruleId2,...]` - Fix specific rules"
+      display: "- `rules [severity]` - Show available lint rules"
+      display: "- `generate-tmdl [prompt]` - Generate TMDL script"
+      display: "- `connect` - Connect to Analysis Services model"
       display: ""
       display: "**Output Modes:**"
       display: "- **Default (quiet/succinct)**: Shows violations table + summary only"
@@ -656,8 +655,8 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
       display: "- 🔵 1 = Info (suggestions)"
       display: ""
       display: "**Usage Examples:**"
-      display: "- `/lint --verbose` - Lint with full details"
-      display: "- `/lint-workspace --quiet` - Scan workspace, table output only"
+      display: "- `lint --verbose` - Lint with full details"
+      display: "- `lint-workspace --quiet` - Scan workspace, table output only"
       display: "- Paste TMDL/PQ code directly to auto-lint in quiet mode"
   }
 
@@ -753,7 +752,7 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
 
       // Help
       /help|commands|what can you do/i =>
-        /help
+        help
 
       // Code provided without explicit command
       (input contains 'let' && input contains 'in' && input contains '=') =>

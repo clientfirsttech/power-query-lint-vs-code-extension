@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 
 /**
  * Activates the Power Query Lint extension
@@ -7,24 +6,6 @@ import * as path from 'path';
  */
 export function activate(context: vscode.ExtensionContext) {
   console.log('Power Query Lint extension is now active');
-
-  // Register the Chat Participant
-  try {
-    const participant = vscode.chat.createChatParticipant('power-query-lint', async (request, chatContext, stream, token) => {
-      const agentPath = context.asAbsolutePath('agent.md');
-      const agentFile = await vscode.workspace.fs.readFile(vscode.Uri.file(agentPath));
-      const systemPrompt = agentFile.toString();
-
-      stream.markdown(`Processing: ${request.prompt}`);
-      // TODO: Wire up to remote MCP agent
-    });
-
-    participant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'images', 'icon.jpg');
-    context.subscriptions.push(participant);
-    console.log('Power Query Lint: Chat participant @PowerQueryLint registered successfully');
-  } catch (err) {
-    console.error('Power Query Lint: Failed to register chat participant', err);
-  }
 
   // Register lint document command
   const lintDocumentCommand = vscode.commands.registerCommand(

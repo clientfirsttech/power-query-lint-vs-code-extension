@@ -3,11 +3,15 @@
   "displayName": "Power Query Lint",
   "description": "Visual Studio Code Extension for Power Query Lint with MCP server support",
   "version": "0.1.0",
-  "publisher": "clientfirsttech",
+  "publisher": "Client First Technologies",
   "icon": "images/icon.jpg",
   "engines": {
     "vscode": "^1.93.0"
   },
+  "extensionDependencies": [
+    "github.copilot-chat"
+  ],
+
   "categories": [
     "Linters",
     "Programming Languages"
@@ -20,16 +24,16 @@
     "model-context-protocol"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onChatParticipant:power-query-lint"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "chatParticipants": [
+    "chatAgents": [
       {
-        "id": "power-query-lint",
-        "name": "PowerQueryLint",
-        "description": "Power Query linting and analysis agent powered by remote MCP tools"
+        "path": "resources/agents/power-query-linter.md"
+      },
+      {
+        "path": "resources/agents/power-query-tester.md"
       }
     ],
     "commands": [
