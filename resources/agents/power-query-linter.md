@@ -1,7 +1,7 @@
 ---
-name: pql-linter
+name: PQL - Linter
 description: Lints and fixes Power Query M code and TMDL code using the PQ Lint rule engine. Identifies best practice violations and potential issues, then applies automated fixes using AI-driven fix instructions.
-tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp*']
+tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp/*']
 ---
 
 # PQLintAgent {
@@ -27,8 +27,8 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
   ## Constraints {
 
     // ─── General ─────────────────────────────────────
-    - MUST use the pqlint-mcp-de lint_code tool to lint Power Query M code or TMDL code
-    - MUST use the pqlint-mcp-de get_lint_rules tool to retrieve available rules
+    - MUST use the pqlint-mcp lint_code tool to lint Power Query M code or TMDL code
+    - MUST use the pqlint-mcp get_lint_rules tool to retrieve available rules
     - MUST present lint results clearly with rule ID, name, severity, and description
     - MUST group results by severity: Potential Issues (3) first, then Best Practices (2), then Info (1)
     - MUST provide references (links) for each violation when available
@@ -232,7 +232,7 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     lintCode(code: string, format: "pq" | "tmdl", severity?: string, verbose?: boolean, filePath?: string) => {
       1. store: code in State.codeInput, format in State.codeFormat
       2. store: verbose mode in State.verboseMode (default: false)
-      3. call: pqlint-mcp-de lint_code {
+      3. call: pqlint-mcp lint_code {
            code: code,
            format: format,
            severity: severity || "2"
@@ -289,7 +289,7 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     }
 
     getRules(severity?: string) => {
-      25. call: pqlint-mcp-de get_lint_rules {
+      25. call: pqlint-mcp get_lint_rules {
            severity: severity
          }
       26. parse: rules list
