@@ -2,7 +2,7 @@
   "name": "power-query-lint",
   "displayName": "Power Query Lint",
   "description": "Visual Studio Code Extension for Power Query Lint with MCP server support",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "clientfirsttech",
   "icon": "images/icon.jpg",
   "engines": {
