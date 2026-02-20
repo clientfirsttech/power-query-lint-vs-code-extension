@@ -18,6 +18,7 @@
     "model-context-protocol"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onLanguage:powerquery"
   ],
   "main": "./dist/extension.js",

@@ -78,10 +78,7 @@ The `mcp.json` file in the extension root configures the MCP server:
     "power-query-lint": {
       "command": "node",
       "args": ["${workspaceFolder}/dist/mcp-server.js"],
-      "description": "MCP server for Power Query linting and analysis",
-      "env": {
-        "DEBUG": "mcp:*"
-      }
+      "description": "MCP server for Power Query linting and analysis"
     }
   }
 }
@@ -89,13 +86,9 @@ The `mcp.json` file in the extension root configures the MCP server:
 
 #### Available MCP Tools
 
-1. **lint_powerquery**: Lint Power Query code
-   - Input: `code` (string), optional `filePath` (string)
-   - Returns: Linting results with issues found
-
-2. **analyze_powerquery**: Analyze Power Query code for patterns
-   - Input: `code` (string)
-   - Returns: Code analysis insights
+1. **lint_powerquery**: Lint and analyze Power Query code
+   - Input: `code` (string, required), `filePath` (string, optional), `analyze` (boolean, optional)
+   - Returns: Linting results with issues found; when `analyze` is `true`, also includes pattern insights
 
 #### Setting up MCP for AI Agents
 

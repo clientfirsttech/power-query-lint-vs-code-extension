@@ -16,7 +16,7 @@ import {
 const TOOLS = [
   {
     name: 'lint_powerquery',
-    description: 'Lint a Power Query file or code snippet',
+    description: 'Lint and analyze Power Query code for errors, patterns, and best practices',
     inputSchema: {
       type: 'object',
       properties: {
@@ -28,25 +28,28 @@ const TOOLS = [
           type: 'string',
           description: 'Optional file path for context',
         },
-      },
-      required: ['code'],
-    },
-  },
-  {
-    name: 'analyze_powerquery',
-    description: 'Analyze Power Query code for patterns and best practices',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        code: {
-          type: 'string',
-          description: 'Power Query code to analyze',
+        analyze: {
+          type: 'boolean',
+          description: 'Include pattern analysis and best practice insights',
+          default: false,
         },
       },
       required: ['code'],
     },
   },
 ];
+
+/**
+ * Result structure for the lint_powerquery tool
+ */
+interface LintResult {
+  status: string;
+  message: string;
+  issues: unknown[];
+  filePath: string;
+  codeLength: number;
+  insights?: string[];
+}
 
 /**
  * Create and configure the MCP server
@@ -79,39 +82,27 @@ async function main() {
       case 'lint_powerquery': {
         const code = args?.code as string;
         const filePath = args?.filePath as string | undefined;
-        
-        // TODO: Implement actual linting logic
-        // For now, return a placeholder response
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                status: 'success',
-                message: 'Linting completed',
-                issues: [],
-                filePath: filePath || 'inline',
-                codeLength: code?.length || 0,
-              }, null, 2),
-            },
-          ],
-        };
-      }
+        const analyze = args?.analyze as boolean | undefined;
 
-      case 'analyze_powerquery': {
-        const code = args?.code as string;
-        
-        // TODO: Implement actual analysis logic
+        // TODO: Implement actual linting logic
+        const result: LintResult = {
+          status: 'success',
+          message: 'Linting completed',
+          issues: [],
+          filePath: filePath || 'inline',
+          codeLength: code?.length || 0,
+        };
+
+        if (analyze) {
+          // TODO: Implement actual analysis logic
+          result.insights = ['Code structure looks good'];
+        }
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                status: 'success',
-                message: 'Analysis completed',
-                insights: ['Code structure looks good'],
-                codeLength: code?.length || 0,
-              }, null, 2),
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
