@@ -5,7 +5,7 @@ Visual Studio Code Extension for Power Query linting and analysis with Model Con
 ## Features
 
 - 🔍 Lint Power Query files (.pq, .pqm)
-- 🤖 MCP server integration for AI agent support
+- 🤖 MCP integration for AI agent support
 - ⚡ Real-time syntax validation
 - 📝 Language support for Power Query
 
@@ -34,7 +34,7 @@ Visual Studio Code Extension for Power Query linting and analysis with Model Con
    npm run compile
    ```
 
-4. Press F5 in VS Code to launch the extension in a new Extension Development Host window.
+4. Press `F5` in VS Code to launch the extension in a new Extension Development Host window.
 
 ### From VSIX Package
 
@@ -45,7 +45,7 @@ Visual Studio Code Extension for Power Query linting and analysis with Model Con
 
 2. Install the generated `.vsix` file:
    - Open VS Code
-   - Go to Extensions view (Ctrl+Shift+X / Cmd+Shift+X)
+   - Go to Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`)
    - Click the `...` menu → "Install from VSIX..."
    - Select the generated `power-query-lint-*.vsix` file
 
@@ -61,70 +61,20 @@ code --install-extension clientfirsttech.power-query-lint
 
 ### Linting Commands
 
-- **Lint Document**: Use Command Palette (Ctrl+Shift+P / Cmd+Shift+P) → `Power Query: Lint Document`
-- **Lint Workspace**: Use Command Palette → `Power Query: Lint Workspace`
+Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and run:
 
-### MCP Server Configuration
+- `Power Query: Lint Document` — lint the active file
+- `Power Query: Lint Workspace` — lint all Power Query files in the workspace
 
-The extension includes an MCP server that allows AI agents to interact with Power Query linting functionality.
+### MCP Configuration
 
-#### Configuration File
-
-The `mcp.json` file in the extension root configures the MCP server:
-
-```json
-{
-  "mcpServers": {
-    "power-query-lint": {
-      "command": "node",
-      "args": ["${workspaceFolder}/dist/mcp-server.js"],
-      "description": "MCP server for Power Query linting and analysis",
-      "env": {
-        "DEBUG": "mcp:*"
-      }
-    }
-  }
-}
-```
-
-#### Available MCP Tools
-
-1. **lint_powerquery**: Lint Power Query code
-   - Input: `code` (string), optional `filePath` (string)
-   - Returns: Linting results with issues found
-
-2. **analyze_powerquery**: Analyze Power Query code for patterns
-   - Input: `code` (string)
-   - Returns: Code analysis insights
-
-#### Setting up MCP for AI Agents
-
-To use the MCP server with Claude Desktop or other MCP-compatible clients:
-
-1. Locate your MCP client configuration file:
-   - **Claude Desktop (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Claude Desktop (Windows)**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. Add the Power Query Lint MCP server configuration:
-   ```json
-   {
-     "mcpServers": {
-       "power-query-lint": {
-         "command": "node",
-         "args": ["/path/to/extension/dist/mcp-server.js"]
-       }
-     }
-   }
-   ```
-
-3. Restart your MCP client
+MCP tools are defined remotely and configured via the `mcp.json` file in the extension root. No local MCP server setup is required.
 
 ## Extension Settings
 
-This extension contributes the following settings:
-
-- `powerQueryLint.enable`: Enable/disable Power Query linting (default: `true`)
-- `powerQueryLint.mcpServer.enabled`: Enable MCP server for AI agent integration (default: `true`)
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `powerQueryLint.enable` | boolean | `true` | Enable/disable Power Query linting |
 
 ## Development
 
@@ -133,12 +83,13 @@ This extension contributes the following settings:
 ```
 power-query-lint-vs-code-extension/
 ├── src/
-│   ├── extension.ts       # Main extension entry point
-│   └── mcp-server.ts      # MCP server implementation
+│   └── extension.ts       # Main extension entry point
+├── examples/
+│   └── sample.pq          # Sample Power Query file
 ├── .vscode/
 │   ├── launch.json        # VS Code debug configuration
 │   └── tasks.json         # Build tasks
-├── mcp.json               # MCP server configuration
+├── mcp.json               # MCP configuration (remote tools)
 ├── package.json           # Extension manifest
 ├── tsconfig.json          # TypeScript configuration
 └── README.md              # This file
@@ -155,16 +106,49 @@ npm run package    # Create VSIX package
 
 ### Testing
 
-To test the extension:
-
 1. Open the project in VS Code
-2. Press F5 to launch the Extension Development Host
-3. Open a Power Query file (.pq or .pqm)
+2. Press `F5` to launch the Extension Development Host
+3. Open a Power Query file (`.pq` or `.pqm`)
 4. Run linting commands from the Command Palette
+
+### Making Changes
+
+- Relaunch the extension from the debug toolbar after making changes
+- Or reload (`Ctrl+R` / `Cmd+R`) the VS Code window to pick up changes
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Conventional Commits
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) with [standard-version](https://github.com/conventional-changelog/standard-version) for automated semantic versioning.
+
+Use these commit prefixes:
+
+| Prefix | Version Bump | Example |
+|--------|-------------|---------|
+| `fix:` | Patch (0.0.x) | `fix: resolve lint crash on empty files` |
+| `feat:` | Minor (0.x.0) | `feat: add new lint rule for table references` |
+| `feat!:` or `BREAKING CHANGE:` | Major (x.0.0) | `feat!: redesign configuration schema` |
+| `chore:` | No bump | `chore: update dependencies` |
+| `docs:` | No bump | `docs: update README` |
+| `refactor:` | No bump | `refactor: simplify linting pipeline` |
+
+### Releasing
+
+```bash
+npm run release        # auto-detect bump from commit history
+npm run release:patch  # force patch bump (0.0.x)
+npm run release:minor  # force minor bump (0.x.0)
+npm run release:major  # force major bump (x.0.0)
+```
+
+Then push with tags:
+
+```bash
+git push --follow-tags origin main
+```
 
 ## License
 
@@ -176,3 +160,4 @@ MIT
 - [Issues](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/issues)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [VS Code Extension API](https://code.visualstudio.com/api)
+- [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)

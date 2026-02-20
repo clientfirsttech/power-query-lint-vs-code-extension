@@ -4,8 +4,9 @@
   "description": "Visual Studio Code Extension for Power Query Lint with MCP server support",
   "version": "0.0.1",
   "publisher": "clientfirsttech",
+  "icon": "images/icon.jpg",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.93.0"
   },
   "categories": [
     "Linters",
@@ -13,15 +14,24 @@
   ],
   "keywords": [
     "power-query",
+    "power-bi",
     "lint",
     "mcp",
     "model-context-protocol"
   ],
   "activationEvents": [
-    "onLanguage:powerquery"
+    "onStartupFinished",
+    "onChatParticipant:power-query-lint"
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "power-query-lint",
+        "name": "PowerQueryLint",
+        "description": "Power Query linting and analysis agent powered by remote MCP tools"
+      }
+    ],
     "commands": [
       {
         "command": "powerquery-lint.lint",
@@ -53,11 +63,6 @@
           "type": "boolean",
           "default": true,
           "description": "Enable/disable Power Query linting"
-        },
-        "powerQueryLint.mcpServer.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable MCP server for AI agent integration"
         }
       }
     }
@@ -68,19 +73,21 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
     "lint": "eslint src --ext ts",
-    "package": "vsce package"
+    "package": "vsce package",
+    "release": "standard-version",
+    "release:minor": "standard-version --release-as minor",
+    "release:major": "standard-version --release-as major",
+    "release:patch": "standard-version --release-as patch"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
-    "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "@typescript-eslint/parser": "^6.15.0",
+    "@types/vscode": "^1.93.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
     "@vscode/vsce": "^2.22.0",
-    "eslint": "^8.56.0",
+    "eslint": "^10.0.1",
+    "standard-version": "^9.5.0",
     "typescript": "^5.3.3"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.2"
   },
   "repository": {
     "type": "git",

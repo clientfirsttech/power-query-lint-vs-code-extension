@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 
 /**
  * Activates the Power Query Lint extension
@@ -6,6 +7,24 @@ import * as vscode from 'vscode';
  */
 export function activate(context: vscode.ExtensionContext) {
   console.log('Power Query Lint extension is now active');
+
+  // Register the Chat Participant
+  try {
+    const participant = vscode.chat.createChatParticipant('power-query-lint', async (request, chatContext, stream, token) => {
+      const agentPath = context.asAbsolutePath('agent.md');
+      const agentFile = await vscode.workspace.fs.readFile(vscode.Uri.file(agentPath));
+      const systemPrompt = agentFile.toString();
+
+      stream.markdown(`Processing: ${request.prompt}`);
+      // TODO: Wire up to remote MCP agent
+    });
+
+    participant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'images', 'icon.jpg');
+    context.subscriptions.push(participant);
+    console.log('Power Query Lint: Chat participant @PowerQueryLint registered successfully');
+  } catch (err) {
+    console.error('Power Query Lint: Failed to register chat participant', err);
+  }
 
   // Register lint document command
   const lintDocumentCommand = vscode.commands.registerCommand(
@@ -40,13 +59,49 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(lintDocumentCommand);
   context.subscriptions.push(lintWorkspaceCommand);
 
-  // Check if MCP server is enabled
-  const config = vscode.workspace.getConfiguration('powerQueryLint');
-  const mcpEnabled = config.get<boolean>('mcpServer.enabled', true);
-  
-  if (mcpEnabled) {
-    console.log('MCP server integration is enabled');
-    // MCP server will be started based on mcp.json configuration
+  // Ensure required settings are configured
+  configureMcpSettings();
+}
+
+/**
+ * Ensures MCP inputs and chat tools settings are configured
+ */
+async function configureMcpSettings() {
+  const config = vscode.workspace.getConfiguration();
+
+  // Ensure mcp.inputs includes the subscription key prompt
+  const mcpInputs = config.get<any[]>('mcp.inputs', []);
+  const hasSubscriptionKey = mcpInputs.some(
+    (input: any) => input.id === 'OCP_APIM_SUBSCRIPTION_KEY'
+  );
+
+  if (!hasSubscriptionKey) {
+    const updatedInputs = [
+      ...mcpInputs,
+      {
+        type: 'promptString',
+        id: 'OCP_APIM_SUBSCRIPTION_KEY',
+        description: 'Enter Subscription Key to Power Query Lint',
+        password: true,
+      },
+    ];
+    await config.update('mcp.inputs', updatedInputs, vscode.ConfigurationTarget.Global);
+  }
+
+  // Ensure the pqlint-mcp server is registered
+  const mcpServers = config.get<Record<string, any>>('mcp.servers', {});
+  if (!mcpServers['pqlint-mcp']) {
+    const updatedServers = {
+      ...mcpServers,
+      'pqlint-mcp': {
+        url: 'https://pqlint.com/api/mcp',
+        type: 'http',
+        headers: {
+          'Ocp-Apim-Subscription-Key': '${input:OCP_APIM_SUBSCRIPTION_KEY}',
+        },
+      },
+    };
+    await config.update('mcp.servers', updatedServers, vscode.ConfigurationTarget.Global);
   }
 }
 
