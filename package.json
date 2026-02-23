@@ -6,7 +6,7 @@
   "publisher": "Client First Technologies",
   "icon": "images/icon.jpg",
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.99.0"
   },
   "extensionDependencies": [
     "github.copilot-chat"
@@ -33,6 +33,14 @@
       },
       {
         "path": "resources/agents/power-query-tester.md"
+      }
+    ],
+    "chatSkills": [
+      {
+        "path": "./skills/pql-assert"
+      },
+      {
+        "path": "./skills/dax-query-guidelines"
       }
     ],
     "commands": [
