@@ -51,10 +51,10 @@ Visual Studio Code Extension for Power Query linting and analysis with Model Con
 
 ### From VS Code Marketplace
 
-*(Coming soon once published)*
+Install directly from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=ClientFirstTechnologies.power-query-lint):
 
 ```bash
-code --install-extension clientfirsttech.power-query-lint
+code --install-extension ClientFirstTechnologies.power-query-lint
 ```
 
 ## Usage
@@ -149,6 +149,74 @@ Then push with tags:
 ```bash
 git push --follow-tags origin main
 ```
+
+## Publishing to VS Code Marketplace
+
+### One-Time Setup
+
+1. **Create a Publisher** at [Visual Studio Marketplace](https://marketplace.visualstudio.com/manage)
+   - Sign in with your Microsoft account
+   - The publisher ID for this extension is `ClientFirstTechnologies`
+
+2. **Install VSCE** (if not already installed):
+   ```bash
+   npm install -g @vscode/vsce
+   ```
+
+3. **Create a Personal Access Token (PAT)**:
+   - Go to [Azure DevOps](https://dev.azure.com)
+   - Navigate to **User Settings > Personal Access Tokens**
+   - Create a new token with **Marketplace (Manage)** scope
+   - Copy the token (you won't see it again)
+
+4. **Login with VSCE**:
+   ```bash
+   vsce login ClientFirstTechnologies
+   ```
+   Paste your PAT when prompted.
+
+### Publishing
+
+**Package locally** (optional, for testing):
+```bash
+vsce package
+```
+
+This creates a `.vsix` file you can install locally:
+```bash
+code --install-extension power-query-lint-0.2.1.vsix
+```
+
+**Publish to Marketplace**:
+```bash
+vsce publish
+```
+
+Or publish with an automatic version bump:
+```bash
+vsce publish patch   # 0.2.1 → 0.2.2
+vsce publish minor   # 0.2.1 → 0.3.0
+vsce publish major   # 0.2.1 → 1.0.0
+```
+
+### Important Notes
+
+- The `publisher` field in `package.json` must match your Marketplace publisher ID (`ClientFirstTechnologies`)
+- The `version` must increase on every publish
+- Do not set `"private": true` in `package.json`
+- The extension will appear at: https://marketplace.visualstudio.com/items?itemName=ClientFirstTechnologies.power-query-lint
+- It may take 2–10 minutes to show up after publishing
+
+### Required Files
+
+Ensure these files exist before publishing:
+
+| File | Purpose |
+|------|---------|
+| `README.md` | Marketplace listing page content |
+| `CHANGELOG.md` | Version history |
+| `LICENSE` | License file |
+| `images/icon.jpg` | Extension icon (128x128 recommended) |
 
 ## License
 

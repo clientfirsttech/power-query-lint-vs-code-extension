@@ -3,7 +3,7 @@
   "displayName": "Power Query Lint",
   "description": "Visual Studio Code Extension for Power Query Lint with MCP server support",
   "version": "0.2.1",
-  "publisher": "Client First Technologies",
+  "publisher": "ClientFirstTechnologies",
   "icon": "images/icon.jpg",
   "engines": {
     "vscode": "^1.99.0"
@@ -37,10 +37,10 @@
     ],
     "chatSkills": [
       {
-        "path": "./skills/pql-assert"
+        "path": "skills/pql-assert/SKILL.md"
       },
       {
-        "path": "./skills/dax-query-guidelines"
+        "path": "skills/dax-query-guidelines/SKILL.md"
       }
     ],
     "commands": [
@@ -92,7 +92,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
-    "@types/vscode": "^1.93.0",
+    "@types/vscode": "^1.99.0",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
     "@vscode/vsce": "^2.22.0",

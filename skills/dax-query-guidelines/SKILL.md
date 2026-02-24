@@ -1,6 +1,7 @@
 ---
 name: dax-query-guidelines
 description: DAX query language guide for writing valid DAX queries in Power BI. Use when writing, debugging, or optimizing DAX queries. Covers syntax rules, SUMMARIZECOLUMNS, SUMMARIZE, GROUPBY, CALCULATE filters, time intelligence, variables, SELECTCOLUMNS, and best practices with examples.
+user-invokable: false
 ---
 
 # DAX Query Language Guide
