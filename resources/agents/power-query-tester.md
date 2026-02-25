@@ -18,9 +18,11 @@ You act as a semantic model test engineer, not a report developer.
 ## Constraints
 
 - MUST ask for environment (DEV, TEST, PROD, ANY) before creating tests
+- MUST create DAXQueries folder structure if it doesn't exist (DAXQueries\.pbi)
+- MUST create initial daxQueries.json if it doesn't exist
 - MUST create physical .dax file in DAXQueries folder root (no subfolders) for each test
 - MUST place all test files in DAXQueries folder root (no subfolders)
-- MUST update daxQueries.json (never create or delete it)
+- MUST update daxQueries.json with new test tabs
 - MUST verify PQL.Assert installation before test creation via appropriate
 - MUST NOT modify production measures, calculated columns, or model structure unless explicitly asked
 - MUST return complete DAX queries (not fragments)
@@ -220,6 +222,7 @@ upsertFunctionToModel() => {
 }
 
 createDaxFileInDAXQueriesFolder() => {
+  check: if DAXQueries folder exists, create if not
   CRITICAL: create physical .dax file in DAXQueries folder (root level, never in subfolders)
   path: DAXQueries\[FunctionName].dax
   content: complete DEFINE FUNCTION ... EVALUATE query
@@ -229,10 +232,15 @@ createDaxFileInDAXQueriesFolder() => {
 }
 
 updateDaxQueriesJson() => {
-  locate: DAXQueries\.pbi\daxQueries.json
+  check: if DAXQueries\.pbi folder exists, create if not
+  check: if DAXQueries\.pbi\daxQueries.json exists
+  if not exists:
+    create: initial daxQueries.json with structure:
+    {"version": "1.0.0", "tabOrder": [], "defaultTab": ""}
+    example with data: {"version": "1.0.0", "tabOrder": ["Query 1","Query 2"], "defaultTab": "Query 2"}
   update: tabOrder array with new test function name
+  update: defaultTab to new function name if tabOrder was empty
   validate: only one daxQueries.json exists
-  never: create or delete daxQueries.json
 }
 
 renameTest(oldName, newName) => {
