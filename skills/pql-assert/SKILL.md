@@ -12,7 +12,7 @@ A comprehensive DAX assertion library for writing unit tests in Power BI and Ana
 
 ### Installation
 
-1. Load the `functions.tmdl` file into your semantic model
+1. Load the [`functions.tmdl`](references/functions.tmdl) file (located in the references folder) into your semantic model
 2. Refresh the model to make functions available
 3. Start writing tests using PQL.Assert functions
 
@@ -105,8 +105,8 @@ EVALUATE PQL.Assert.ShouldEqual("Test 1: 2+2 should equal 4", 4, 2+2)
 
 #### Categorical, Membership & Format
 
-- `PQL.Assert.Col.ValuesShouldBeInSet(testName, columnRef, allowedValues)` - Asserts all column values are in the specified allowed set (table)
-- `PQL.Assert.Col.ValuesShouldNotBeInSet(testName, columnRef, bannedValues)` - Asserts no column values are in the specified banned set (table)
+- `PQL.Assert.Col.ValuesShouldBeInSet(testName, columnRef, allowedValuesTable, allowedValuesColumn)` - Asserts all column values are in the specified allowed set (model-independent: explicitly specify table and column)
+- `PQL.Assert.Col.ValuesShouldNotBeInSet(testName, columnRef, bannedValuesTable, bannedValuesColumn)` - Asserts no column values are in the specified banned set (model-independent: explicitly specify table and column)
 - `PQL.Assert.Col.DistinctCountShouldBeAtMost(testName, columnRef, maxDistinct)` - Asserts distinct count of values is at most the specified number
 - `PQL.Assert.Col.DistinctCountShouldBeAtLeast(testName, columnRef, minDistinct)` - Asserts distinct count of values is at least the specified number
 - `PQL.Assert.Col.TextShouldHaveNoLeadingOrTrailingSpaces(testName, columnRef)` - Asserts no text values have leading or trailing spaces
