@@ -12,7 +12,7 @@ A comprehensive DAX assertion library for writing unit tests in Power BI and Ana
 
 ### Installation
 
-1. Load the [`functions.tmdl`](references/functions.tmdl) file (located in the references folder) into your semantic model
+1. Load the [`functions.tmdl`](references/functions.tmdl) file (located in the extension's `skills/pql-assert/references/` folder) into your semantic model
 2. Refresh the model to make functions available
 3. Start writing tests using PQL.Assert functions
 
