@@ -68,3 +68,5 @@ MIT
 ## Links
 
 - [Support](mailto:support@pqlint.com) — For questions or issues, email support@pqlint.com
+- [Terms of Service](http://www.pqlint.com/terms-of-service) — Terms and conditions for using this extension
+- [Privacy Policy](http://www.pqlint.com/privacy-policy) — How we handle your data and privacy
