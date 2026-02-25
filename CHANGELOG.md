@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.2.3...v0.3.0) (2026-02-25)
+
+
+### Features
+
+* moved fucntions.tmdl into skills ([7f6f7b7](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/commit/7f6f7b736294cde7b511fe48ba5bf8ea9b7fe2cb))
+
 ### [0.2.3](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.2.2...v0.2.3) (2026-02-24)
 
 
