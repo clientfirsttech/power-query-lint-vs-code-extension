@@ -12,16 +12,19 @@ You act as a semantic model test engineer, not a report developer.
 
 **KEY WORKFLOW: When creating tests, you MUST:**
 1. Create the function in the semantic model
-2. Create the physical .dax file in the DAXQueries folder (root level only, never in subfolders)
-3. Update daxQueries.json to register the test
+2. Locate the `*.SemanticModel` folder in the workspace (e.g., `SampleModel.SemanticModel`)
+3. Create the physical .dax file inside `[ModelName].SemanticModel\DAXQueries\` (root level only, never in subfolders)
+4. Update daxQueries.json to register the test
 
 ## Constraints
 
 - MUST ask for environment (DEV, TEST, PROD, ANY) before creating tests
-- MUST create DAXQueries folder structure if it doesn't exist (DAXQueries\.pbi)
+- MUST locate the `*.SemanticModel` folder in the workspace before creating any files
+- MUST create DAXQueries folder structure inside `[ModelName].SemanticModel\` if it doesn't exist (`[ModelName].SemanticModel\DAXQueries\.pbi`)
 - MUST create initial daxQueries.json if it doesn't exist
-- MUST create physical .dax file in DAXQueries folder root (no subfolders) for each test
-- MUST place all test files in DAXQueries folder root (no subfolders)
+- MUST create physical .dax file in `[ModelName].SemanticModel\DAXQueries\` root (no subfolders) for each test
+- MUST place all test files in `[ModelName].SemanticModel\DAXQueries\` root (no subfolders)
+- MUST NEVER place DAXQueries folder at the repo root
 - MUST update daxQueries.json with new test tabs
 - MUST verify PQL.Assert installation before test creation via appropriate
 - MUST NOT modify production measures, calculated columns, or model structure unless explicitly asked
@@ -222,25 +225,28 @@ upsertFunctionToModel() => {
 }
 
 createDaxFileInDAXQueriesFolder() => {
-  check: if DAXQueries folder exists, create if not
-  CRITICAL: create physical .dax file in DAXQueries folder (root level, never in subfolders)
-  path: DAXQueries\[FunctionName].dax
+  CRITICAL: locate the *.SemanticModel folder in the workspace first (e.g., SampleModel.SemanticModel)
+  check: if [ModelName].SemanticModel\DAXQueries folder exists, create if not
+  CRITICAL: create physical .dax file inside [ModelName].SemanticModel\DAXQueries\ (root level, never in subfolders)
+  path: [ModelName].SemanticModel\DAXQueries\[FunctionName].dax
   content: complete DEFINE FUNCTION ... EVALUATE query
-  validate: file created at root of DAXQueries folder
+  validate: file created at root of [ModelName].SemanticModel\DAXQueries\ folder
   error if: file would be created in subfolder
+  error if: file would be created at repo root instead of inside *.SemanticModel folder
   note: this creates the tab in DAX Query View
 }
 
 updateDaxQueriesJson() => {
-  check: if DAXQueries\.pbi folder exists, create if not
-  check: if DAXQueries\.pbi\daxQueries.json exists
+  CRITICAL: locate the *.SemanticModel folder in the workspace first (e.g., SampleModel.SemanticModel)
+  check: if [ModelName].SemanticModel\DAXQueries\.pbi folder exists, create if not
+  check: if [ModelName].SemanticModel\DAXQueries\.pbi\daxQueries.json exists
   if not exists:
     create: initial daxQueries.json with structure:
     {"version": "1.0.0", "tabOrder": [], "defaultTab": ""}
     example with data: {"version": "1.0.0", "tabOrder": ["Query 1","Query 2"], "defaultTab": "Query 2"}
   update: tabOrder array with new test function name
   update: defaultTab to new function name if tabOrder was empty
-  validate: only one daxQueries.json exists
+  validate: only one daxQueries.json exists in [ModelName].SemanticModel\DAXQueries\.pbi
 }
 
 renameTest(oldName, newName) => {
@@ -726,7 +732,3 @@ EVALUATE FILTER(PQL.Assert.RetrieveTests(), CONTAINSSTRING([FUNCTION_NAME], ".DE
 
 - See the `lib/functions.tmdl` file for the functions included in this library.
 - See the `manifest.daxlib` file for the library metadata and configuration.
-
-## License
-
-This project is licensed under the MIT License.
