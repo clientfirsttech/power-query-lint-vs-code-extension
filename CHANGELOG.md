@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.4](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.3.3...v0.3.4) (2026-02-27)
+
+
+### Features
+
+* adjust power query tester instructions ([a901172](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/commit/a901172f8b7006df401f26c603bab09ea840888b))
+
 ### [0.3.3](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.3.2...v0.3.3) (2026-02-25)
 
 ### [0.3.2](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.3.1...v0.3.2) (2026-02-25)
