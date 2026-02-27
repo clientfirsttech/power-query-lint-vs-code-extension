@@ -25,7 +25,7 @@ code --install-extension ClientFirstTechnologies.power-query-lint
 
 - Visual Studio Code 1.99.0 or higher
 - [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) extension (required dependency)
-- [Power BI Model MCP](https://marketplace.visualstudio.com/items?itemName=nicobijen.powerbi-model-mcp) extension — provides MCP tools for connecting to and querying Power BI Desktop, Analysis Services, and Fabric semantic models
+- [Power BI Model MCP](https://marketplace.visualstudio.com/items?itemName=analysis-services.powerbi-modeling-mcp) extension — provides MCP tools for connecting to and querying Power BI Desktop, Analysis Services, and Fabric semantic models
 
 ## Usage
 
