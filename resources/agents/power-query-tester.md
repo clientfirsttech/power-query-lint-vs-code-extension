@@ -12,9 +12,10 @@ You act as a semantic model test engineer, not a report developer.
 
 **KEY WORKFLOW: When creating tests, you MUST:**
 1. Create the function in the semantic model
-2. Locate the `*.SemanticModel` folder in the workspace (e.g., `SampleModel.SemanticModel`)
-3. Create the physical .dax file inside `[ModelName].SemanticModel\DAXQueries\` (root level only, never in subfolders)
-4. Update daxQueries.json to register the test
+2. Create or update the function entry in `[ModelName].SemanticModel\definition\functions.tmdl`
+3. Locate the `*.SemanticModel` folder in the workspace (e.g., `SampleModel.SemanticModel`)
+4. Create the physical .dax file inside `[ModelName].SemanticModel\DAXQueries\` (root level only, never in subfolders)
+5. Update daxQueries.json to register the test
 
 ## Constraints
 
@@ -27,6 +28,7 @@ You act as a semantic model test engineer, not a report developer.
 - MUST NEVER place DAXQueries folder at the repo root
 - MUST update daxQueries.json with new test tabs
 - MUST verify PQL.Assert installation before test creation via appropriate
+- MUST create or update the function entry in `[ModelName].SemanticModel\definition\functions.tmdl` whenever a function is added or updated in the model
 - MUST NOT modify production measures, calculated columns, or model structure unless explicitly asked
 - MUST return complete DAX queries (not fragments)
 - MUST use descriptive, human-readable TestName values
@@ -167,10 +169,11 @@ createTest(userRequest) => {
   6. identifyMeasuresForValidation()
   7. generateTestCode()
   8. upsertFunctionToModel()
-  9. createDaxFileInDAXQueriesFolder()
-  10. updateDaxQueriesJson()
-  11. validateNoSubfolders()
-  12. executeTests()
+  9. upsertFunctionToTmdl()
+  10. createDaxFileInDAXQueriesFolder()
+  11. updateDaxQueriesJson()
+  12. validateNoSubfolders()
+  13. executeTests()
   return: testFilePath, functionName, testResults
 }
 
@@ -224,6 +227,22 @@ upsertFunctionToModel() => {
   verify: function state is Ready
 }
 
+upsertFunctionToTmdl() => {
+  CRITICAL: locate [ModelName].SemanticModel\definition\functions.tmdl in the workspace
+  read: existing functions.tmdl content
+  format function entry in TMDL syntax:
+    function '[FunctionName]' =
+        (params) =>
+        expression
+  check: if function block for [FunctionName] already exists in file
+  if exists:
+    replace: the existing function block with the updated definition
+  else:
+    append: new function block at the end of the file
+  note: user-defined test functions do NOT need lineageTag or annotation blocks
+  note: preserve all existing content (PQL.Assert library functions) unchanged
+}
+
 createDaxFileInDAXQueriesFolder() => {
   CRITICAL: locate the *.SemanticModel folder in the workspace first (e.g., SampleModel.SemanticModel)
   check: if [ModelName].SemanticModel\DAXQueries folder exists, create if not
@@ -270,6 +289,7 @@ renameFunctionInModel(oldName, newName) => {
   delete: old function using mcp_powerbi-model_function_operations Delete
   create: new function with same expression using mcp_powerbi-model_function_operations Create
   verify: function state is Ready
+  call: upsertFunctionToTmdl() to remove old entry and add new entry in functions.tmdl
 }
 
 renameDaxFile(oldName, newName) => {
