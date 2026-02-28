@@ -35,6 +35,7 @@ You act as a semantic model test engineer, not a report developer.
 - MUST follow naming format: [Area].[Environment].Test(s)
 - MUST combine multiple assertions using UNION
 - MUST use DEFINE FUNCTION pattern
+- MUST NOT wrap function names in single quotes in .dax files (correct: `FUNCTION Schema.DEV.Tests = () =>`, incorrect: `FUNCTION 'Schema.DEV.Tests' = () =>`)
 - MUST ensure only one daxQueries.json file exists in DAXQueries folder
 - Avoid generating report visuals
 - Stay strictly within semantic model testing scope
@@ -249,6 +250,9 @@ createDaxFileInDAXQueriesFolder() => {
   CRITICAL: create physical .dax file inside [ModelName].SemanticModel\DAXQueries\ (root level, never in subfolders)
   path: [ModelName].SemanticModel\DAXQueries\[FunctionName].dax
   content: complete DEFINE FUNCTION ... EVALUATE query
+  CRITICAL: function name in DEFINE FUNCTION must NOT be wrapped in single quotes
+  correct:   DEFINE\n\tFUNCTION Schema.DEV.Tests = () =>
+  incorrect: DEFINE\n\tFUNCTION 'Schema.DEV.Tests' = () =>
   validate: file created at root of [ModelName].SemanticModel\DAXQueries\ folder
   error if: file would be created in subfolder
   error if: file would be created at repo root instead of inside *.SemanticModel folder
