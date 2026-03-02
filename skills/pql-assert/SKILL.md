@@ -149,6 +149,8 @@ PQL.Assert includes built-in semantic model validation functions based on Best P
 
 > **Note:** Additional validation rules are being added continuously. This is an initial set covering the most critical model health checks.
 
+> **Important — Schema Difference:** `PQL.Assert.BP` functions return a **5-column schema** (TestName, Expected, Actual, Passed, **RuleDescription**), which differs from the standard 4-column schema used by all other `PQL.Assert` functions. **Never UNION `PQL.Assert.BP` results with standard `PQL.Assert` results.** Keep BP test runners completely separate from standard test runners. You may UNION BP functions with other BP functions freely, since they all share the same 5-column schema.
+
 #### Error Prevention
 
 - `PQL.Assert.BP.ShouldHaveSameDataTypeInRelationships()` - Validates that relationship columns have matching data types (avoiding int64→decimal relationships)
@@ -193,7 +195,7 @@ EVALUATE PQL.Assert.BP.ShouldProvideFormatStringForMeasures()
 EVALUATE PQL.Assert.BP.CheckFormatting()
 EVALUATE PQL.Assert.BP.CheckPerformance()
 
-// Combine all best practice checks
+// Combine all best practice checks (BP-only UNION is safe — all share the 5-column schema)
 EVALUATE UNION(
     PQL.Assert.BP.CheckErrorPrevention(),
     PQL.Assert.BP.CheckFormatting(),
@@ -201,6 +203,12 @@ EVALUATE UNION(
     PQL.Assert.BP.CheckMaintenance(),
     PQL.Assert.BP.CheckPerformance()
 )
+
+// ❌ WRONG — do NOT mix BP and standard PQL.Assert results in a UNION
+// EVALUATE UNION(
+//     PQL.Assert.BP.CheckFormatting(),          -- 5-column schema
+//     PQL.Assert.ShouldEqual("My test", 1, 1)  -- 4-column schema → runtime error
+// )
 ```
 
 ## Workspace Governance & Environments
@@ -359,24 +367,39 @@ EVALUATE FILTER(PQL.Assert.RetrieveTests(), CONTAINSSTRING([FUNCTION_NAME], ".AN
 
 After discovering tests, you can run them individually or create environment-specific test runners:
 
+> **Important:** Keep `PQL.Assert.BP` runners strictly separate from standard test runners. BP functions return a 5-column schema; standard functions return 4 columns. Mixing them in a single `UNION` causes a runtime error.
+
 ```dax
 DEFINE
-	// Run all DEV tests
+	// Run all DEV tests (standard 4-column schema only)
 	FUNCTION DEV.AllTests = () =>
 	UNION (
 		BusinessLogic.DEV.Tests(),
 		DataQuality.DEV.Tests()
 	)
 	
-	// Run all production health checks
+	// Run all production health checks (standard 4-column schema only)
 	FUNCTION PROD.HealthChecks = () =>
 	UNION (
 		DataContent.ANY.Tests(),
 		Schema.ANY.Tests()
 	)
 
+	// Best practice checks — SEPARATE runner (5-column schema; never mix with above)
+	FUNCTION BestPractices.AllChecks = () =>
+	UNION (
+		PQL.Assert.BP.CheckErrorPrevention(),
+		PQL.Assert.BP.CheckFormatting(),
+		PQL.Assert.BP.CheckDAXExpressions(),
+		PQL.Assert.BP.CheckMaintenance(),
+		PQL.Assert.BP.CheckPerformance()
+	)
+
 EVALUATE DEV.AllTests()
 EVALUATE PROD.HealthChecks()
+
+// BP checks are evaluated independently — never combined with standard test runners
+EVALUATE BestPractices.AllChecks()
 ```
 
 ### Test Validation
@@ -413,6 +436,7 @@ EVALUATE _Validation
 - Create separate test functions for different areas (data validation, business logic, etc.)
 - Use meaningful function names like `DataQuality.Tests`, `Calculations.Tests`
 - Keep tests focused and atomic - test one thing per assertion
+- **Never UNION `PQL.Assert.BP` results with standard `PQL.Assert` results.** BP functions return a 5-column schema (TestName, Expected, Actual, Passed, RuleDescription); all other functions return 4 columns. Always keep BP test runners in dedicated functions that contain only BP calls, and keep standard test runners free of BP calls.
 
 ### Example Test Structure
 
