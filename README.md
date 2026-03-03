@@ -63,7 +63,7 @@ For information about development, building, testing, and publishing this extens
 
 ## License
 
-MIT
+Released under the [Business Source License 1.1](LICENSE). Non-production use is permitted. The license converts to [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html) four years from the date each version is published.
 
 ## Links
 

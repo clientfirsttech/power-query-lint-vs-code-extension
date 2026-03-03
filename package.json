@@ -104,5 +104,5 @@
     "type": "git",
     "url": "https://github.com/clientfirsttech/power-query-lint-vs-code-extension.git"
   },
-  "license": "AGPL-3.0-or-later"
+  "license": "BUSL-1.1"
 }
