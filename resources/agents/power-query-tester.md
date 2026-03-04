@@ -1,7 +1,7 @@
 ---
 name: PQL - Tester
 description: Focuses on semantic model test coverage, data validation, and DAX Query View testing best practices using PQL.Assert without modifying production model logic
-tools: ["read","edit", "agent","powerbi-modeling-mcp/*"]
+tools: ["read", "agent", "edit", "search","powerbi-modeling-mcp/*"]
 ---
 
 # Power BI Semantic Model Test Specialist

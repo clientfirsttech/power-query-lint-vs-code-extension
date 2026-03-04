@@ -1,6 +1,6 @@
 ---
 name: pql-assert
-description: PQL.Assert DAX unit testing library documentation. Use when writing, understanding, or debugging DAX-based unit tests for Power BI and Analysis Services semantic models. Covers assertion functions for values, columns, tables, relationships, best practices, test discovery, and environment governance.
+description: PQL.Assert DAX unit testing library documentation. Use when writing, understanding, or debugging DAX-based unit tests for Power BI and Analysis Services semantic models. Covers assertion functions for values, columns, tables, relationships, best practices, test discovery, environment governance, and function name validation against reserved DAX words.
 user-invokable: false
 ---
 
@@ -430,6 +430,15 @@ EVALUATE _Validation
 - Use descriptive test names that explain what is being tested
 - Include "should pass" or "should fail" for validation automation
 - Group related tests in functions ending with `.Tests`
+
+### Function Name Restrictions
+
+DAX user-defined function names must not match any reserved DAX word. The complete list of reserved words is maintained in [`references/reserved-dax-words.md`](references/reserved-dax-words.md). Key rules:
+
+- Perform a **case-insensitive** exact match between the function name and each reserved word.
+- Flag the name as an **error** if it exactly matches a reserved word (e.g., naming a function `filter`, `sum`, or `calculate`).
+- Flag the name with a **warning** if it contains a reserved word without a delimiter (e.g., `filterData` contains `filter`).
+- Consult [`references/reserved-dax-words.md`](references/reserved-dax-words.md) for the authoritative list when writing or reviewing function names.
 
 ### Test Organization
 
