@@ -2,6 +2,20 @@
 
 All notable changes to the "power-query-lint" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **`pql-test` CLI** — command-line tool for discovering and executing `PQL.Assert` tests from PBIP models
+  - `retrieve-tests <modelPath>` — list all tests (encapsulates `PQL.Assert RetrieveTests`)
+  - `retrieve-test <modelPath> <name>` — retrieve a single test by name (encapsulates `PQL.Assert RetrieveTestByName`)
+  - `run-tests <modelPath> [--test <name>]` — execute all tests or a specific named test
+  - `check-prereqs` — verify Node.js and npm prerequisites
+  - `--verbose` flag for detailed output (file paths, assertion descriptions, durations)
+- **`src/pql-test-runner.ts`** — core library with `retrieveTests()`, `retrieveTestByName()`, `runTest()`, `runTests()`, and `runTestsFromModel()` functions
+- **`examples/samplemodel/`** — sample PBIP model with three `PQL.Assert` test files demonstrating the expected folder structure
+- **`scripts/check-prereqs.js`** — prerequisite check script (runs automatically on `npm install` via `postinstall`)
+- Test suite (45 tests) using Node.js built-in `node:test` runner covering the core library and CLI
+
 ## [0.0.1] - 2026-02-13
 
 ### Added
