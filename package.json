@@ -62,13 +62,19 @@
       }
     }
   },
+  "bin": {
+    "pql-test": "./dist/cli.js"
+  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
+    "test": "node --test dist/test/pql-test-runner.test.js dist/test/cli.test.js",
     "lint": "eslint src --ext ts",
-    "package": "vsce package"
+    "package": "vsce package",
+    "check-prereqs": "node scripts/check-prereqs.js",
+    "postinstall": "node scripts/check-prereqs.js"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
