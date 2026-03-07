@@ -3,12 +3,25 @@
 /**
  * pql-test CLI
  *
- * Command-line interface for discovering and executing Power Query tests
- * stored inside a PBIP (Power BI Project) model.
+ * Command-line interface for discovering and executing DAX tests stored inside
+ * a PBIP (Power BI Project) semantic model's DAXQueries/ folder.
+ *
+ * Tests are *.Tests.dax files executed via Invoke-ASCmd (Analysis Services
+ * PowerShell module), mirroring the Invoke-DQVTesting pattern.
+ *
+ * Connection resolution:
+ *   - When --tenant-id, --workspace-id, and --dataset-id are all provided the
+ *     CLI connects to the remote Power BI Premium / Fabric XMLA endpoint.
+ *   - Otherwise the CLI auto-detects a locally-open Power BI Desktop instance
+ *     using the local Analysis Services port file, provided a .pbip file exists
+ *     in <modelPath>.
  *
  * Usage:
  *   pql-test retrieve-tests <modelPath>
- *   pql-test run-tests <modelPath> [--test <name>] [--verbose]
+ *   pql-test run-tests      <modelPath> [--test <name>] [--verbose]
+ *                                        [--tenant-id <id>]
+ *                                        [--workspace-id <id>]
+ *                                        [--dataset-id <id>]
  *   pql-test check-prereqs
  */
 
@@ -19,8 +32,10 @@ import {
   retrieveTests,
   retrieveTestByName,
   runTestsFromModel,
+  resolveXmlaConnection,
   PqlTest,
   TestSuite,
+  XmlaConnectionOptions,
 } from './pql-test-runner';
 
 // ---------------------------------------------------------------------------
@@ -65,6 +80,45 @@ export function checkPrereqs(): PrereqResult[] {
     });
   }
 
+  // PowerShell (pwsh) check — required for Invoke-ASCmd
+  try {
+    const pwshVersion = execSync('pwsh --version', { encoding: 'utf8' }).trim();
+    results.push({
+      name: 'PowerShell (pwsh) installed',
+      ok: true,
+      detail: pwshVersion,
+    });
+  } catch {
+    results.push({
+      name: 'PowerShell (pwsh) installed',
+      ok: false,
+      detail:
+        'pwsh not found on PATH — required for XMLA test execution via Invoke-ASCmd. ' +
+        'Install from https://github.com/PowerShell/PowerShell',
+    });
+  }
+
+  // SqlServer PowerShell module check (provides Invoke-ASCmd)
+  try {
+    const checkCmd =
+      'pwsh -NoProfile -NonInteractive -Command "if (Get-Module -ListAvailable -Name SqlServer) { Write-Output ok } else { Write-Output missing }"';
+    const moduleStatus = execSync(checkCmd, { encoding: 'utf8' }).trim();
+    const hasModule = moduleStatus.includes('ok');
+    results.push({
+      name: 'SqlServer PowerShell module (Invoke-ASCmd)',
+      ok: hasModule,
+      detail: hasModule
+        ? 'SqlServer module available'
+        : 'Module not found — install with: Install-Module SqlServer -Scope CurrentUser',
+    });
+  } catch {
+    results.push({
+      name: 'SqlServer PowerShell module (Invoke-ASCmd)',
+      ok: false,
+      detail: 'Could not check module availability (pwsh unavailable)',
+    });
+  }
+
   return results;
 }
 
@@ -88,7 +142,7 @@ function printTests(tests: PqlTest[], verbose: boolean): void {
     return;
   }
 
-  console.log(`\nFound ${tests.length} test(s):\n`);
+  console.log(`\nFound ${tests.length} DAX test suite(s):\n`);
   for (const t of tests) {
     console.log(`  • ${t.name}`);
     if (t.description) {
@@ -139,7 +193,11 @@ function cmdCheckPrereqs(): void {
   process.exitCode = allOk ? 0 : 1;
 }
 
-function cmdRetrieveTests(modelPath: string, verbose: boolean): void {
+function cmdRetrieveTests(
+  modelPath: string,
+  verbose: boolean,
+  connOpts: XmlaConnectionOptions
+): void {
   const absolutePath = path.resolve(modelPath);
 
   if (!fs.existsSync(absolutePath)) {
@@ -150,6 +208,18 @@ function cmdRetrieveTests(modelPath: string, verbose: boolean): void {
 
   const tests = retrieveTests(absolutePath);
   printTests(tests, verbose);
+
+  // Show connection info when verbose
+  if (verbose && tests.length > 0) {
+    const conn = resolveXmlaConnection(absolutePath, connOpts);
+    if (conn) {
+      console.log(`Connection: ${conn.server} / ${conn.catalog}`);
+    } else {
+      console.log(
+        'Connection: none detected — open the model in Power BI Desktop or supply --tenant-id, --workspace-id, --dataset-id to run tests.'
+      );
+    }
+  }
 }
 
 function cmdRetrieveTestByName(
@@ -182,7 +252,8 @@ function cmdRetrieveTestByName(
 function cmdRunTests(
   modelPath: string,
   testName: string | undefined,
-  verbose: boolean
+  verbose: boolean,
+  connOpts: XmlaConnectionOptions
 ): void {
   const absolutePath = path.resolve(modelPath);
 
@@ -202,7 +273,20 @@ function cmdRunTests(
     }
   }
 
-  const suite = runTestsFromModel(absolutePath, testName);
+  // Show which XMLA connection will be used
+  const conn = resolveXmlaConnection(absolutePath, connOpts);
+  if (conn) {
+    console.log(`\nXMLA connection: ${conn.server} / catalog: ${conn.catalog}`);
+  } else {
+    console.warn(
+      '\nWarning: No XMLA connection detected. Tests will be reported as skipped.\n' +
+        'Options:\n' +
+        '  • Open the model in Power BI Desktop (auto-detected)\n' +
+        '  • Supply --tenant-id <id> --workspace-id <id> --dataset-id <id>\n'
+    );
+  }
+
+  const suite = runTestsFromModel(absolutePath, testName, connOpts);
   printResults(suite, verbose);
 
   // Exit with non-zero code if any tests failed
@@ -224,22 +308,41 @@ Usage:
   pql-test <command> [options]
 
 Commands:
-  retrieve-tests <modelPath>          List all tests discovered in a PBIP model
-  retrieve-test  <modelPath> <name>   Show a specific test by name
-  run-tests      <modelPath>          Run all tests in a PBIP model
+  retrieve-tests <modelPath>          List all DAX test suites discovered in a PBIP model
+  retrieve-test  <modelPath> <name>   Show a specific test suite by name
+  run-tests      <modelPath>          Run all DAX test suites in a PBIP model
   check-prereqs                       Verify prerequisites are installed
 
-Options:
-  --test <name>    Run or retrieve only the named test (alias for retrieve-test / run-tests filter)
-  --verbose, -v    Show additional output (file paths, durations, source)
+Connection options (for run-tests):
+  --tenant-id    <id>   Azure AD tenant ID (required for remote XMLA)
+  --workspace-id <id>   Power BI workspace GUID (required for remote XMLA)
+  --dataset-id   <id>   Dataset / semantic model GUID (required for remote XMLA)
+
+  When none of the above are supplied the CLI auto-detects a locally-open
+  Power BI Desktop instance from the .pbip file in <modelPath>.
+
+Other options:
+  --test <name>    Run or retrieve only the named test suite
+  --verbose, -v    Show additional output (file paths, durations, source, connection)
   --help,    -h    Show this help message
   --version, -V    Show version
 
 Examples:
-  pql-test retrieve-tests ./examples/samplemodel
-  pql-test retrieve-test  ./examples/samplemodel "Sales Total Should Be Positive"
-  pql-test run-tests      ./examples/samplemodel
-  pql-test run-tests      ./examples/samplemodel --test "Sales Total Should Be Positive"
+  # Discover DAX test suites
+  pql-test retrieve-tests ./examples/SampleModel
+
+  # Run against a locally-open Power BI Desktop model (auto-detected)
+  pql-test run-tests ./examples/SampleModel
+
+  # Run against a remote Power BI Premium / Fabric workspace
+  pql-test run-tests ./examples/SampleModel \\
+    --tenant-id  00000000-0000-0000-0000-000000000000 \\
+    --workspace-id 11111111-1111-1111-1111-111111111111 \\
+    --dataset-id   22222222-2222-2222-2222-222222222222
+
+  # Run a single test suite by name
+  pql-test run-tests ./examples/SampleModel --test "Calculations.DEV.Tests"
+
   pql-test check-prereqs
 `);
 }
@@ -251,6 +354,7 @@ function parseArgs(argv: string[]): {
   verbose: boolean;
   help: boolean;
   version: boolean;
+  connOpts: XmlaConnectionOptions;
 } {
   const positional: string[] = [];
   let command: string | undefined;
@@ -258,6 +362,7 @@ function parseArgs(argv: string[]): {
   let verbose = false;
   let help = false;
   let version = false;
+  const connOpts: XmlaConnectionOptions = {};
 
   const args = argv.slice(2); // strip node + script path
   let i = 0;
@@ -271,6 +376,12 @@ function parseArgs(argv: string[]): {
       verbose = true;
     } else if ((arg === '--test' || arg === '-t') && i + 1 < args.length) {
       testName = args[++i];
+    } else if (arg === '--tenant-id' && i + 1 < args.length) {
+      connOpts.tenantId = args[++i];
+    } else if (arg === '--workspace-id' && i + 1 < args.length) {
+      connOpts.workspaceId = args[++i];
+    } else if (arg === '--dataset-id' && i + 1 < args.length) {
+      connOpts.datasetId = args[++i];
     } else if (!arg.startsWith('-')) {
       if (!command) {
         command = arg;
@@ -281,7 +392,7 @@ function parseArgs(argv: string[]): {
     i++;
   }
 
-  return { command, positional, testName, verbose, help, version };
+  return { command, positional, testName, verbose, help, version, connOpts };
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +400,7 @@ function parseArgs(argv: string[]): {
 // ---------------------------------------------------------------------------
 
 function main(): void {
-  const { command, positional, testName, verbose, help, version } = parseArgs(
+  const { command, positional, testName, verbose, help, version, connOpts } = parseArgs(
     process.argv
   );
 
@@ -323,7 +434,7 @@ function main(): void {
         // --test flag was supplied: behave like retrieve-test
         cmdRetrieveTestByName(modelPath, testName, verbose);
       } else {
-        cmdRetrieveTests(modelPath, verbose);
+        cmdRetrieveTests(modelPath, verbose, connOpts);
       }
       break;
     }
@@ -349,7 +460,7 @@ function main(): void {
         process.exitCode = 1;
         return;
       }
-      cmdRunTests(modelPath, testName, verbose);
+      cmdRunTests(modelPath, testName, verbose, connOpts);
       break;
     }
 

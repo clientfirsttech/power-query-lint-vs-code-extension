@@ -1,8 +1,0 @@
-createOrReplace model Model
-  culture: en-US
-  dataAccessOptions
-    legacyRedirects: true
-    returnErrorValuesAsNull: true
-  defaultPowerBIDataSourceVersion: powerBI_V3
-  discourageImplicitMeasures
-
