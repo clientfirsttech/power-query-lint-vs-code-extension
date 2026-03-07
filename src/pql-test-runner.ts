@@ -10,7 +10,7 @@
  * or a Power BI Premium / Fabric workspace endpoint.
  *
  * XMLA connection resolution priority:
- *   1. Local Power BI Desktop (localhost:NNNNN) – detected automatically when
+ *   1. Local Power BI Desktop (<PBI_LOCAL_HOST>:NNNNN) – detected automatically when
  *      a .pbip file exists in modelPath and a PBIDesktop process is running.
  *   2. Remote workspace endpoint built from tenantId + workspaceId + datasetId
  *      when those parameters are provided.
@@ -24,6 +24,25 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync, spawnSync } from 'child_process';
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * Hostname used for local Power BI Desktop XMLA connections.
+ * Override with the PBI_LOCAL_HOST environment variable when connecting to a
+ * PBI Desktop instance that is not reachable at "localhost" (e.g. in a
+ * containerised or remote development environment).
+ *
+ * The value is read at call time so that the environment variable can be set
+ * after the module is loaded (useful in tests and CLI wrappers).
+ *
+ * @example PBI_LOCAL_HOST=my-dev-box pql-test run-tests ./SampleModel
+ */
+export function getLocalPbiHost(): string {
+  return process.env['PBI_LOCAL_HOST'] ?? 'localhost';
+}
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -168,8 +187,8 @@ function buildRemoteXmlaConnectionString(opts: Required<XmlaConnectionOptions>):
  *   %LOCALAPPDATA%\Microsoft\Power BI Desktop\AnalysisServicesWorkspaces\
  *       AnalysisServicesWorkspace<port>\Data\msmdsrv.port.txt
  *
- * Returns a connection string like "localhost:50001" when found, otherwise
- * undefined.
+ * Returns a connection string like "<LOCAL_PBI_HOST>:50001" when found,
+ * otherwise undefined.
  */
 function detectLocalPbiDesktopPort(): string | undefined {
   const localAppData = process.env['LOCALAPPDATA'];
@@ -193,7 +212,7 @@ function detectLocalPbiDesktopPort(): string | undefined {
     if (fs.existsSync(portFile)) {
       const port = fs.readFileSync(portFile, 'utf8').trim();
       if (/^\d+$/.test(port)) {
-        return `localhost:${port}`;
+        return `${getLocalPbiHost()}:${port}`;
       }
     }
   }

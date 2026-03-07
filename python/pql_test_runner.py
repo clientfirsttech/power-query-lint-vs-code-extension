@@ -16,7 +16,7 @@ XMLA connection resolution priority:
      Service principal credentials (client_id + client_secret) are used
      to acquire an OAuth2 access token via MSAL — matching the auth flow
      used by Invoke-DQVTesting for CI/CD build agents.
-  2. Local Power BI Desktop (localhost:NNNNN) — detected automatically when
+  2. Local Power BI Desktop (<PBI_LOCAL_HOST>:NNNNN) — detected automatically when
      a .pbip file exists in model_path and a PBIDesktop process is running.
 
 Results are parsed from the standard 4-column PQL.Assert schema:
@@ -57,6 +57,20 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+#: Hostname used for local Power BI Desktop XMLA connections.
+#: Override with the ``PBI_LOCAL_HOST`` environment variable when connecting to
+#: a PBI Desktop instance that is not reachable at ``"localhost"`` (e.g. in a
+#: containerised or remote development environment).
+#:
+#: Example::
+#:
+#:     PBI_LOCAL_HOST=my-dev-box pql-test run-tests ./SampleModel
+LOCAL_PBI_HOST: str = os.environ.get("PBI_LOCAL_HOST", "localhost")
 
 # ---------------------------------------------------------------------------
 # Public data types
@@ -144,7 +158,7 @@ class LocalPbiInstance:
     model_name: str
     """Window title with " - Power BI Desktop" suffix stripped."""
     server: str
-    """XMLA server string, e.g. "localhost:63402"."""
+    """XMLA server string, e.g. "localhost:63402" (hostname from LOCAL_PBI_HOST)."""
     catalog: str
     """Catalog name or GUID from DBSCHEMA_CATALOGS."""
 
@@ -248,7 +262,7 @@ def _get_catalog_from_local_port(port: int) -> Optional[str]:
     if not HAS_PYADOMD:
         return None
     try:
-        conn_str = f"Provider=MSOLAP;Data Source=localhost:{port};"
+        conn_str = f"Provider=MSOLAP;Data Source={LOCAL_PBI_HOST}:{port};"
         with Pyadomd(conn_str) as db:
             with db.cursor().execute("select * from $SYSTEM.DBSCHEMA_CATALOGS") as cur:
                 rows = cur.fetchall()
@@ -315,7 +329,7 @@ def get_pbi_files_opened() -> list[LocalPbiInstance]:
                     instances.append(
                         LocalPbiInstance(
                             model_name=model_name,
-                            server=f"localhost:{port}",
+                            server=f"{LOCAL_PBI_HOST}:{port}",
                             catalog=catalog,
                         )
                     )
@@ -393,7 +407,9 @@ def _detect_local_pbi_desktop_port() -> Optional[str]:
           AnalysisServicesWorkspaces\\AnalysisServicesWorkspace<port>\\
           Data\\msmdsrv.port.txt
 
-    Returns a connection string like "localhost:50001" when found.
+    Returns a connection string like "<LOCAL_PBI_HOST>:50001" when found.
+    (The hostname defaults to "localhost" but can be overridden via the
+    PBI_LOCAL_HOST environment variable.)
     """
     local_app_data = os.environ.get("LOCALAPPDATA")
     if not local_app_data:
@@ -411,7 +427,7 @@ def _detect_local_pbi_desktop_port() -> Optional[str]:
         if port_file.exists():
             port = port_file.read_text(encoding="utf-8").strip()
             if port.isdigit():
-                return f"localhost:{port}"
+                return f"{LOCAL_PBI_HOST}:{port}"
     return None
 
 

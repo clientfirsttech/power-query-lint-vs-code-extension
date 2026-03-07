@@ -8,6 +8,7 @@ Run with:
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -22,12 +23,14 @@ from unittest.mock import MagicMock
 from pql_test_runner import (
     HAS_PSUTIL,
     HAS_PYADOMD,
+    LOCAL_PBI_HOST,
     LocalPbiInstance,
     PqlTest,
     ResolvedXmlaConnection,
     TestResult,
     XmlaConnectionOptions,
     _collect_dax_test_files,
+    _detect_local_pbi_desktop_port,
     _find_pbip_file,
     _find_semantic_model_dir,
     get_pbi_files_opened,
@@ -39,6 +42,7 @@ from pql_test_runner import (
     run_tests,
     run_tests_from_model,
 )
+import pql_test_runner
 from tests.conftest import make_dax_source
 
 
@@ -327,7 +331,7 @@ class TestResolveXmlaConnection:
         ):
             conn = resolve_xmla_connection(str(tmp_path), opts)
         assert conn is not None
-        assert "powerbi://api.powerbi.com" in conn.server
+        assert conn.server.startswith("powerbi://api.powerbi.com/v1.0/")
 
     def test_requires_all_three_remote_params(self, tmp_path):
         # Missing dataset_id — should not produce a remote connection
@@ -879,3 +883,108 @@ class TestResolveLocalXmlaConnection:
         # No *.Tests.dax files → total == 0, like Pester $warnings.Length > 0
         assert suite.total == 0
         assert suite.tests == []
+
+
+# ---------------------------------------------------------------------------
+# LOCAL_PBI_HOST / PBI_LOCAL_HOST environment variable (dynamic hostname)
+# ---------------------------------------------------------------------------
+
+class TestLocalPbiHost:
+    """Tests that the PBI_LOCAL_HOST environment variable makes the local
+    Power BI Desktop hostname configurable at runtime."""
+
+    def test_default_hostname_is_localhost(self):
+        """When PBI_LOCAL_HOST is not set the hostname defaults to 'localhost'."""
+        with patch.dict("os.environ", {}, clear=False):
+            os_environ_backup = os.environ.pop("PBI_LOCAL_HOST", None)
+            pql_test_runner.LOCAL_PBI_HOST = "localhost"
+            try:
+                import importlib
+                import pql_test_runner as _runner
+                importlib.reload(_runner)
+                assert _runner.LOCAL_PBI_HOST == "localhost"
+            finally:
+                if os_environ_backup is not None:
+                    os.environ["PBI_LOCAL_HOST"] = os_environ_backup
+                    pql_test_runner.LOCAL_PBI_HOST = os_environ_backup
+                else:
+                    pql_test_runner.LOCAL_PBI_HOST = "localhost"
+
+    def test_custom_hostname_is_read_from_env(self, monkeypatch):
+        """When PBI_LOCAL_HOST is set its value is used as the hostname."""
+        monkeypatch.setenv("PBI_LOCAL_HOST", "my-dev-box")
+        import importlib
+        import pql_test_runner as _runner
+        importlib.reload(_runner)
+        try:
+            assert _runner.LOCAL_PBI_HOST == "my-dev-box"
+        finally:
+            # Restore to default so other tests are not affected
+            monkeypatch.delenv("PBI_LOCAL_HOST", raising=False)
+            importlib.reload(_runner)
+
+    def test_detect_port_file_uses_custom_hostname(self, tmp_path, monkeypatch):
+        """
+        _detect_local_pbi_desktop_port builds the server string using
+        LOCAL_PBI_HOST so the hostname is not hardcoded to 'localhost'.
+        """
+        ws_dir = (
+            tmp_path
+            / "Microsoft"
+            / "Power BI Desktop"
+            / "AnalysisServicesWorkspaces"
+            / "AnalysisServicesWorkspace55555"
+            / "Data"
+        )
+        ws_dir.mkdir(parents=True)
+        (ws_dir / "msmdsrv.port.txt").write_text("55555")
+
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        monkeypatch.setattr(pql_test_runner, "LOCAL_PBI_HOST", "custom-host")
+
+        result = _detect_local_pbi_desktop_port()
+        assert result == "custom-host:55555"
+
+    def test_detect_port_file_defaults_to_localhost(self, tmp_path, monkeypatch):
+        """
+        When PBI_LOCAL_HOST is not set the server string uses 'localhost'.
+        """
+        ws_dir = (
+            tmp_path
+            / "Microsoft"
+            / "Power BI Desktop"
+            / "AnalysisServicesWorkspaces"
+            / "AnalysisServicesWorkspace66666"
+            / "Data"
+        )
+        ws_dir.mkdir(parents=True)
+        (ws_dir / "msmdsrv.port.txt").write_text("66666")
+
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        monkeypatch.setattr(pql_test_runner, "LOCAL_PBI_HOST", "localhost")
+
+        result = _detect_local_pbi_desktop_port()
+        assert result == "localhost:66666"
+
+    def test_get_pbi_files_opened_uses_custom_hostname(self, monkeypatch):
+        """
+        get_pbi_files_opened builds the server string using LOCAL_PBI_HOST
+        so that msmdsrv ports are accessible via the configured hostname.
+        """
+        if not HAS_PSUTIL:
+            pytest.skip("psutil not installed")
+
+        mock_conn = _make_mock_tcp_listen(port=77777)
+        mock_proc = _make_mock_process(pid=500, name="msmdsrv.exe", ppid=400, listen_port=None)
+        mock_proc.net_connections = MagicMock(return_value=[mock_conn])
+
+        monkeypatch.setattr(pql_test_runner, "LOCAL_PBI_HOST", "remote-host")
+        with (
+            patch("pql_test_runner._get_pbi_process_window_titles", return_value={400: "TestModel - Power BI Desktop"}),
+            patch("pql_test_runner._psutil.process_iter", return_value=[mock_proc]),
+            patch("pql_test_runner._get_catalog_from_local_port", return_value="TestModel"),
+        ):
+            instances = get_pbi_files_opened()
+
+        assert len(instances) == 1
+        assert instances[0].server == "remote-host:77777"
