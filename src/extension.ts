@@ -5,8 +5,6 @@ import * as vscode from 'vscode';
  * This function is called when the extension is activated
  */
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Power Query Lint extension is now active');
-
   // Register lint document command
   const lintDocumentCommand = vscode.commands.registerCommand(
     'powerquery-lint.lint',
@@ -90,6 +88,4 @@ async function configureMcpSettings() {
  * Deactivates the extension
  * This function is called when the extension is deactivated
  */
-export function deactivate() {
-  console.log('Power Query Lint extension has been deactivated');
-}
+export function deactivate() {}
