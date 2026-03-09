@@ -5,8 +5,6 @@ import * as vscode from 'vscode';
  * This function is called when the extension is activated
  */
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Power Query Lint extension is now active');
-
   // Register lint document command
   const lintDocumentCommand = vscode.commands.registerCommand(
     'powerquery-lint.lint',
@@ -40,13 +38,49 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(lintDocumentCommand);
   context.subscriptions.push(lintWorkspaceCommand);
 
-  // Check if MCP server is enabled
-  const config = vscode.workspace.getConfiguration('powerQueryLint');
-  const mcpEnabled = config.get<boolean>('mcpServer.enabled', true);
-  
-  if (mcpEnabled) {
-    console.log('MCP server integration is enabled');
-    // MCP server will be started based on mcp.json configuration
+  // Ensure required settings are configured
+  configureMcpSettings();
+}
+
+/**
+ * Ensures MCP inputs and chat tools settings are configured
+ */
+async function configureMcpSettings() {
+  const config = vscode.workspace.getConfiguration();
+
+  // Ensure mcp.inputs includes the subscription key prompt
+  const mcpInputs = config.get<any[]>('mcp.inputs', []);
+  const hasSubscriptionKey = mcpInputs.some(
+    (input: any) => input.id === 'OCP_APIM_SUBSCRIPTION_KEY'
+  );
+
+  if (!hasSubscriptionKey) {
+    const updatedInputs = [
+      ...mcpInputs,
+      {
+        type: 'promptString',
+        id: 'OCP_APIM_SUBSCRIPTION_KEY',
+        description: 'Enter Subscription Key to Power Query Lint',
+        password: true,
+      },
+    ];
+    await config.update('mcp.inputs', updatedInputs, vscode.ConfigurationTarget.Global);
+  }
+
+  // Ensure the pqlint-mcp server is registered
+  const mcpServers = config.get<Record<string, any>>('mcp.servers', {});
+  if (!mcpServers['pqlint-mcp']) {
+    const updatedServers = {
+      ...mcpServers,
+      'pqlint-mcp': {
+        url: 'https://pqlint.com/api/mcp',
+        type: 'http',
+        headers: {
+          'Ocp-Apim-Subscription-Key': '${input:OCP_APIM_SUBSCRIPTION_KEY}',
+        },
+      },
+    };
+    await config.update('mcp.servers', updatedServers, vscode.ConfigurationTarget.Global);
   }
 }
 
@@ -54,6 +88,4 @@ export function activate(context: vscode.ExtensionContext) {
  * Deactivates the extension
  * This function is called when the extension is deactivated
  */
-export function deactivate() {
-  console.log('Power Query Lint extension has been deactivated');
-}
+export function deactivate() {}

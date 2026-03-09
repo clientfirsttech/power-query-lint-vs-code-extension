@@ -1,178 +1,72 @@
 # Power Query Lint VS Code Extension
 
-Visual Studio Code Extension for Power Query linting and analysis with Model Context Protocol (MCP) support.
+Visual Studio Code Extension for Power Query linting and analysis with Model Context Protocol (MCP) support and semantic model test creation and execution.
 
 ## Features
 
-- 🔍 Lint Power Query files (.pq, .pqm)
-- 🤖 MCP server integration for AI agent support
-- ⚡ Real-time syntax validation
-- 📝 Language support for Power Query
+- **Power Query Linting** — Lint `.pq` and `.pqm` files for best practice violations and potential issues
+- **Workspace Linting** — Lint all Power Query files across the entire workspace in one command
+- **Language Support** — Syntax highlighting and language configuration for Power Query M
+- **MCP Integration** — Model Context Protocol support for AI agent workflows
+- **Copilot Agents** — Built-in GitHub Copilot agents for linting (`PQL - Linter`) and semantic model testing (`PQL - Tester`)
+- **Copilot Skills** — Agent skills for PQL.Assert documentation and DAX query guidelines
 
 ## Installation
 
-### Prerequisites
-
-- Visual Studio Code 1.85.0 or higher
-- Node.js 18.x or higher
-
-### From Source
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/clientfirsttech/power-query-lint-vs-code-extension.git
-   cd power-query-lint-vs-code-extension
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Compile the extension:
-   ```bash
-   npm run compile
-   ```
-
-4. Press F5 in VS Code to launch the extension in a new Extension Development Host window.
-
-### From VSIX Package
-
-1. Build the extension package:
-   ```bash
-   npm run package
-   ```
-
-2. Install the generated `.vsix` file:
-   - Open VS Code
-   - Go to Extensions view (Ctrl+Shift+X / Cmd+Shift+X)
-   - Click the `...` menu → "Install from VSIX..."
-   - Select the generated `power-query-lint-*.vsix` file
-
 ### From VS Code Marketplace
 
-*(Coming soon once published)*
+Install directly from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=ClientFirstTechnologies.power-query-lint):
 
 ```bash
-code --install-extension clientfirsttech.power-query-lint
+code --install-extension ClientFirstTechnologies.power-query-lint
 ```
+
+### Prerequisites
+
+- Visual Studio Code 1.99.0 or higher
+- [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) extension (required dependency)
+- [Power BI Model MCP](https://marketplace.visualstudio.com/items?itemName=analysis-services.powerbi-modeling-mcp) extension — provides MCP tools for connecting to and querying Power BI Desktop, Analysis Services, and Fabric semantic models
 
 ## Usage
 
 ### Linting Commands
 
-- **Lint Document**: Use Command Palette (Ctrl+Shift+P / Cmd+Shift+P) → `Power Query: Lint Document`
-- **Lint Workspace**: Use Command Palette → `Power Query: Lint Workspace`
+Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and run:
 
-### MCP Server Configuration
+- `Power Query: Lint Document` — lint the active file
+- `Power Query: Lint Workspace` — lint all Power Query files in the workspace
 
-The extension includes an MCP server that allows AI agents to interact with Power Query linting functionality.
+### Copilot Agents
 
-#### Configuration File
+This extension contributes two GitHub Copilot agents:
 
-The `mcp.json` file in the extension root configures the MCP server:
+| Agent | Description |
+|-------|-------------|
+| **PQL - Linter** | Lints and fixes Power Query M code and TMDL code using the PQ Lint rule engine |
+| **PQL - Tester** | Creates and manages DAX Query View tests using the PQL.Assert assertion library |
 
-```json
-{
-  "mcpServers": {
-    "power-query-lint": {
-      "command": "node",
-      "args": ["${workspaceFolder}/dist/mcp-server.js"],
-      "description": "MCP server for Power Query linting and analysis",
-      "env": {
-        "DEBUG": "mcp:*"
-      }
-    }
-  }
-}
-```
+### MCP Configuration
 
-#### Available MCP Tools
-
-1. **lint_powerquery**: Lint Power Query code
-   - Input: `code` (string), optional `filePath` (string)
-   - Returns: Linting results with issues found
-
-2. **analyze_powerquery**: Analyze Power Query code for patterns
-   - Input: `code` (string)
-   - Returns: Code analysis insights
-
-#### Setting up MCP for AI Agents
-
-To use the MCP server with Claude Desktop or other MCP-compatible clients:
-
-1. Locate your MCP client configuration file:
-   - **Claude Desktop (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Claude Desktop (Windows)**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. Add the Power Query Lint MCP server configuration:
-   ```json
-   {
-     "mcpServers": {
-       "power-query-lint": {
-         "command": "node",
-         "args": ["/path/to/extension/dist/mcp-server.js"]
-       }
-     }
-   }
-   ```
-
-3. Restart your MCP client
+MCP tools are defined remotely and configured via the `mcp.json` file in the extension root. No local MCP server setup is required.
 
 ## Extension Settings
 
-This extension contributes the following settings:
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `powerQueryLint.enable` | boolean | `true` | Enable/disable Power Query linting |
 
-- `powerQueryLint.enable`: Enable/disable Power Query linting (default: `true`)
-- `powerQueryLint.mcpServer.enabled`: Enable MCP server for AI agent integration (default: `true`)
-
-## Development
-
-### Project Structure
-
-```
-power-query-lint-vs-code-extension/
-├── src/
-│   ├── extension.ts       # Main extension entry point
-│   └── mcp-server.ts      # MCP server implementation
-├── .vscode/
-│   ├── launch.json        # VS Code debug configuration
-│   └── tasks.json         # Build tasks
-├── mcp.json               # MCP server configuration
-├── package.json           # Extension manifest
-├── tsconfig.json          # TypeScript configuration
-└── README.md              # This file
-```
-
-### Building
-
-```bash
-npm run compile    # Compile TypeScript
-npm run watch      # Watch mode for development
-npm run lint       # Run ESLint
-npm run package    # Create VSIX package
-```
-
-### Testing
-
-To test the extension:
-
-1. Open the project in VS Code
-2. Press F5 to launch the Extension Development Host
-3. Open a Power Query file (.pq or .pqm)
-4. Run linting commands from the Command Palette
+---
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+For information about development, building, testing, and publishing this extension, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT
+Released under the [Business Source License 1.1](LICENSE). Non-production use is permitted. The license converts to [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html) four years from the date each version is published.
 
 ## Links
 
-- [Repository](https://github.com/clientfirsttech/power-query-lint-vs-code-extension)
-- [Issues](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/issues)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [VS Code Extension API](https://code.visualstudio.com/api)
+- [Support](mailto:support@pqlint.com) — For questions or issues, email support@pqlint.com
+- [Terms of Service](http://www.pqlint.com/terms-of-service) — Terms and conditions for using this extension
+- [Privacy Policy](http://www.pqlint.com/privacy-policy) — How we handle your data and privacy
