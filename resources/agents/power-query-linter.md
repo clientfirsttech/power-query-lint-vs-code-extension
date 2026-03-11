@@ -34,6 +34,10 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     - MUST provide references (links) for each violation when available
     - MUST NOT invent or fabricate lint rules; only use rules from the PQ Lint engine
     - MUST ask the user before applying fixes that modify their code
+    - MUST always prompt the user to apply fixes after linting, before modifying any TMDL or Power Query code
+    - MUST only apply a fix when AIFixInstructions.IsActive is true AND AIFixInstructions.Prompt is not empty
+    - MUST NOT update code when AIFixInstructions is absent, IsActive is false, or Prompt is empty
+    - MUST use ErrorInformation.lineNumber to target the correct line when applying a non-whole-query fix
     - MUST return the COMPLETE fixed code — never truncate or abridge
     - MUST preserve all existing comments in the code (preceded by '//' characters)
     - MUST preserve exact tab indentation/spacing when applying fixes — never alter tab order
@@ -68,18 +72,39 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
 
   ## Interfaces {
 
+    interface AIFixInstructions {
+      Description: string        // Human-readable description of the fix
+      Prompt: string             // SudoLang fix program to execute; empty string means no fix available
+      IsWholeQueryFix: boolean   // true = rewrite whole query; false = targeted line fix
+      IsActive: boolean          // true = fix is enabled and should be applied
+    }
+
+    // Matches the errorLocation.positionStart / positionEnd objects from the API
+    interface ErrorPosition {
+      codeUnit: number
+      lineCodeUnit: number
+      lineNumber: number         // 1-based
+    }
+
+    // Matches the ErrorInformation object returned in RuleResult
+    interface ErrorInformation {
+      errorLocation: {
+        positionStart: ErrorPosition
+        positionEnd: ErrorPosition
+      } | null
+      filePath: string | null    // File path where the error was found
+    }
+
+    // Matches RuleResult from the API (PascalCase field names)
     interface LintResult {
-      ruleId: string
-      ruleName: string
-      category: "Best Practice" | "Potential Issue"
-      severity: number           // 2 = Best Practice, 3 = Potential Issue
-      description: string
-      references: Reference[]
-      isFixable: boolean
-      fixPrompt: string | null
-      isWholeQueryFix: boolean
-      filePath: string | null    // File path where violation was found
-      location: string | null    // Line/column information
+      ID: string
+      Name: string
+      Category: string
+      Description: string
+      Severity: string           // "1" = Info, "2" = Best Practice, "3" = Potential Issue
+      Passed: boolean
+      ErrorInformation: ErrorInformation | null
+      AIFixInstructions: AIFixInstructions  // Extension property; check IsActive + Prompt
     }
 
     interface Reference {
@@ -87,12 +112,21 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
       link: string
     }
 
+    // Matches the rule object from the /lint/rules endpoint
+    interface Rule {
+      id: string
+      name: string
+      category: string
+      description: string
+      references: Reference[]
+      severity: string
+      minLicenseLevel: string
+    }
+
     interface FixableRule {
-      ruleId: string
-      ruleName: string
-      fixDescription: string
-      fixPrompt: string          // SudoLang fix instructions
-      isWholeQueryFix: boolean
+      ID: string
+      Name: string
+      AIFixInstructions: AIFixInstructions  // Must have IsActive=true and non-empty Prompt
     }
 
     interface ConnectionInfo {
@@ -237,10 +271,10 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
            format: format,
            severity: severity || "2"
          }
-      4. parse: results into LintResult[] with filePath attached to each result
+      4. parse: results into LintResult[] — results use PascalCase field names (ID, Name, Category, Description, Severity, Passed, ErrorInformation)
       5. store: State.lintResults
       6. partition: results by severity
-      7. identify: which results have active AIFixInstructions
+      7. identify: fixable results — those where AIFixInstructions.IsActive == true AND AIFixInstructions.Prompt != ""
       8. store: fixable rules in State.fixableRules
       9. presentLintResults()
       return: State.lintResults
@@ -303,7 +337,7 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
         return
 
       // Sort by severity (Potential Issues first, then Best Practices, then Info)
-      sortedResults = sort(State.lintResults, (a, b) => b.severity - a.severity)
+      sortedResults = sort(State.lintResults, (a, b) => Number(b.Severity) - Number(a.Severity))
 
       // Present results in table format (always shown)
       display: "## Lint Violations"
@@ -312,22 +346,21 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
       display: "|------|------|----------|----------|-------------|----------|"
 
       for each result in sortedResults:
-        fileName = result.filePath ? path.basename(result.filePath) : "N/A"
-        severityText = result.severity == 3 ? "🔴 3" : result.severity == 2 ? "🟡 2" : "🔵 1"
-        category = result.category || (result.severity == 3 ? "Potential Issue" : "Best Practice")
-        fixable = result.isFixable ? "✅ Yes" : "❌ No"
+        fileName = result.ErrorInformation?.filePath ? path.basename(result.ErrorInformation.filePath) : "N/A"
+        severityText = result.Severity == "3" ? "🔴 3" : result.Severity == "2" ? "🟡 2" : "🔵 1"
+        fixable = (result.AIFixInstructions?.IsActive && result.AIFixInstructions?.Prompt != "") ? "✅ Yes" : "❌ No"
         
         // Truncate description for table readability
-        shortDescription = result.description.length > 60 ? 
-                          result.description.substring(0, 57) + "..." : 
-                          result.description
+        shortDescription = result.Description.length > 60 ? 
+                          result.Description.substring(0, 57) + "..." : 
+                          result.Description
         
-        display: "| {fileName} | `{result.ruleId}` | {severityText} | {category} | {shortDescription} | {fixable} |"
+        display: "| {fileName} | `{result.ID}` | {severityText} | {result.Category} | {shortDescription} | {fixable} |"
 
       // Group counts by severity for summary
-      potentialIssues = filter(State.lintResults, severity == 3)
-      bestPractices = filter(State.lintResults, severity == 2)
-      info = filter(State.lintResults, severity == 1)
+      potentialIssues = filter(State.lintResults, Severity == "3")
+      bestPractices = filter(State.lintResults, Severity == "2")
+      info = filter(State.lintResults, Severity == "1")
 
       // Summary
       display: ""
@@ -355,40 +388,34 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
           display: ""
           display: "## 🔴 Potential Issues (Severity 3)"
           for each issue in potentialIssues:
-            display: "- **{issue.ruleName}** (`{issue.ruleId}`)"
-            if issue.filePath:
-              display: "  📁 File: {issue.filePath}"
-            if issue.location:
-              display: "  📍 Location: {issue.location}"
-            display: "  {issue.description}"
-            if issue.references:
-              for each ref in issue.references:
-                display: "  - [{ref.description}]({ref.link})"
+            display: "- **{issue.Name}** (`{issue.ID}`)"
+            if issue.ErrorInformation?.filePath:
+              display: "  📁 File: {issue.ErrorInformation.filePath}"
+            if issue.ErrorInformation?.errorLocation?.positionStart?.lineNumber:
+              display: "  📍 Line: {issue.ErrorInformation.errorLocation.positionStart.lineNumber}"
+            display: "  {issue.Description}"
 
         if bestPractices not empty:
           display: ""
           display: "## 🟡 Best Practices (Severity 2)"
           for each bp in bestPractices:
-            display: "- **{bp.ruleName}** (`{bp.ruleId}`)"
-            if bp.filePath:
-              display: "  📁 File: {bp.filePath}"
-            if bp.location:
-              display: "  📍 Location: {bp.location}"
-            display: "  {bp.description}"
-            if bp.references:
-              for each ref in bp.references:
-                display: "  - [{ref.description}]({ref.link})"
+            display: "- **{bp.Name}** (`{bp.ID}`)"
+            if bp.ErrorInformation?.filePath:
+              display: "  📁 File: {bp.ErrorInformation.filePath}"
+            if bp.ErrorInformation?.errorLocation?.positionStart?.lineNumber:
+              display: "  📍 Line: {bp.ErrorInformation.errorLocation.positionStart.lineNumber}"
+            display: "  {bp.Description}"
 
         if info not empty:
           display: ""
           display: "## 🔵 Info (Severity 1)"
           for each item in info:
-            display: "- **{item.ruleName}** (`{item.ruleId}`)"
-            if item.filePath:
-              display: "  📁 File: {item.filePath}"
-            if item.location:
-              display: "  📍 Location: {item.location}"
-            display: "  {item.description}"
+            display: "- **{item.Name}** (`{item.ID}`)"
+            if item.ErrorInformation?.filePath:
+              display: "  📁 File: {item.ErrorInformation.filePath}"
+            if item.ErrorInformation?.errorLocation?.positionStart?.lineNumber:
+              display: "  📍 Line: {item.ErrorInformation.errorLocation.positionStart.lineNumber}"
+            display: "  {item.Description}"
       else:
         display: ""
         display: "_Use `lint --verbose` to see detailed violation descriptions and references._"
@@ -397,19 +424,25 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
     // ─── Fixing ───────────────────────────────────────────────
 
     fixViolation(ruleId: string) => {
-      28. find: rule in State.fixableRules matching ruleId
+      28. find: rule in State.fixableRules matching rule.ID == ruleId
       29. if not found:
            error: "Rule '{ruleId}' either has no auto-fix available or was not violated."
            return
-      30. retrieve: the AIFixInstructions.Prompt for this rule
-      31. apply: the fix instructions (SudoLang program) against State.codeInput
+      30. guard: if rule.AIFixInstructions.IsActive == false OR rule.AIFixInstructions.Prompt == "":
+           report: "No active fix available for rule '{ruleId}'. Skipping."
+           return
+      31. retrieve: AIFixInstructions.Prompt and the matching LintResult.ErrorInformation
+      32. apply: the fix instructions (SudoLang program) against State.codeInput
+         - pass ErrorInformation.errorLocation.positionStart.lineNumber as the targeted line for non-whole-query fixes
+         - if AIFixInstructions.IsWholeQueryFix == true: rewrite entire query
+         - if AIFixInstructions.IsWholeQueryFix == false: target only the lines indicated by ErrorInformation.errorLocation
          following the Prompt's constraints, process, and examples
-      32. validate: fixed code is syntactically valid
-      33. if State.codeFormat == "tmdl":
+      33. validate: fixed code is syntactically valid
+      34. if State.codeFormat == "tmdl":
            validateTMDL(fixedCode)
-      34. present: diff showing what changed
-      35. ask: "Apply this fix?"
-      36. if confirmed:
+      35. present: diff showing what changed
+      36. ask: "Apply this fix?"
+      37. if confirmed:
            update: State.codeInput with fixed code
            report: fix result
            promptForRelint()
@@ -420,27 +453,31 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
       37. if State.fixableRules is empty:
            report: "No auto-fixable violations found."
            return
-      38. sort: fixable rules by priority
-           - Whole query fixes first (isWholeQueryFix == true)
-           - Then individual fixes
-      39. display: "The following violations will be auto-fixed:"
+      38. filter: only rules where AIFixInstructions.IsActive == true AND AIFixInstructions.Prompt != ""
+           if none remain after filter:
+             report: "No active fixes available."
+             return
+      39. sort: fixable rules by priority
+           - Whole query fixes first (AIFixInstructions.IsWholeQueryFix == true)
+           - Then individual line fixes
+      40. display: "The following violations will be auto-fixed:"
          for each rule:
-           display: "- {rule.ruleName} ({rule.ruleId})"
-      40. ask: "Proceed with fixing all {n} violations?"
-      41. if confirmed:
+           display: "- {rule.Name} ({rule.ID})"
+      41. ask: "Proceed with fixing all {n} violations?"
+      42. if confirmed:
            currentCode = State.codeInput
            for each fixableRule:
-             a. retrieve: AIFixInstructions.Prompt
-             b. apply: fix instructions against currentCode
+             a. retrieve: AIFixInstructions.Prompt and matching LintResult.ErrorInformation
+             b. apply: fix instructions against currentCode using ErrorInformation.errorLocation.positionStart.lineNumber for targeted fixes
              c. validate: fixed code
              d. if State.codeFormat == "tmdl":
                   validateTMDL(fixedCode)
              e. store: FixResult
              f. currentCode = fixedCode
-      42. update: State.codeInput = currentCode
-      43. present: summary of fixes applied
-      44. present: complete fixed code
-      45. promptForRelint()
+      43. update: State.codeInput = currentCode
+      44. present: summary of fixes applied
+      45. present: complete fixed code
+      46. promptForRelint()
       return: FixResult[]
     }
 
@@ -513,31 +550,39 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
 
     // ─── Fix Application Helpers ─────────────────────────────
 
-    applyFixFromPrompt(code: string, fixPrompt: string, format: string) => {
-      // The fixPrompt contains a SudoLang program that describes the fix
+    applyFixFromPrompt(code: string, aiFixInstructions: AIFixInstructions, errorInfo: ErrorInformation | null, format: string) => {
+      // Guard: only proceed if fix is active and has a non-empty prompt
+      if aiFixInstructions.IsActive == false OR aiFixInstructions.Prompt == "":
+        return code unchanged  // MUST NOT modify code
+
+      // The Prompt contains a SudoLang program that describes the fix
       // Execute the fix program against the code
       52. capture: original indentation pattern for each line
-      53. parse: fixPrompt for:
+      53. parse: aiFixInstructions.Prompt for:
            - Purpose
            - Constraints
            - Process steps
            - Examples (before/after patterns)
            - Edge cases
-      54. follow: the Process defined in the fixPrompt step by step
-      55. apply: transformations to the code
-      56. verify: all Constraints from the fixPrompt are satisfied
-      57. verify: Edge Cases are handled
-      58. CRITICAL: verify original indentation is preserved:
+      54. if aiFixInstructions.IsWholeQueryFix == false AND errorInfo?.errorLocation?.positionStart?.lineNumber != null:
+           focus: apply transformations only around errorInfo.errorLocation.positionStart.lineNumber
+           context: use positionStart.lineNumber through positionEnd.lineNumber as the violation range
+           context: use surrounding lines for reference but only mutate the violation line(s)
+      55. follow: the Process defined in the Prompt step by step
+      56. apply: transformations to the code
+      57. verify: all Constraints from the Prompt are satisfied
+      58. verify: Edge Cases are handled
+      59. CRITICAL: verify original indentation is preserved:
            - count tabs per line before fix
            - count tabs per line after fix  
            - ensure no tab count changes unless explicitly required by fix
-      59. if format == "tmdl":
+      60. if format == "tmdl":
            ensure: TMDL constraints are met
            ensure: tabs used for indentation
            ensure: no '= include' syntax
            ensure: all comments preserved
            ensure: CRITICAL - tab order exactly preserved
-      60. if format == "pq":
+      61. if format == "pq":
            ensure: valid M syntax
            ensure: #"Variable Name" notation for special names
            ensure: let...in structure preserved
