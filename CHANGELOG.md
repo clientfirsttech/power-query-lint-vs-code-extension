@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### [0.7.1](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.7.0...v0.7.1) (2026-03-12)
 
+
+### Bug Fixes
+
+* fixViolation step 31 now retrieves AIFixInstructions and ErrorInformation directly from State.lintResults (populated during linting) instead of calling get_lint_rules; falls back to get_lint_rules only when the data is missing
+
 ## [0.7.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.6.1...v0.7.0) (2026-03-11)
 
 
