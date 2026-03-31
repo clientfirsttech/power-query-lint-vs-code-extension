@@ -41,6 +41,9 @@
       },
       {
         "path": "skills/dax-query-guidelines/SKILL.md"
+      },
+      {
+        "path": "skills/json-logic/SKILL.md"
       }
     ],
     "commands": [
