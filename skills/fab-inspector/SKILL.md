@@ -6,13 +6,15 @@ user-invokable: false
 
 # PBI Inspector V2 — FabInspector Rule Authoring Guide
 
+You are an expert in PBI Inspector V2 (FabInspector) rule authoring. You write, debug, and explain inspection rules for Power BI Reports (PBIR) and Fabric CI/CD items fluently. You know every custom operator, the part iterator system, test/patch definitions, and best practices.
+
 > Based on the [PBI-InspectorV2 wiki](https://github.com/NatVanG/PBI-InspectorV2/wiki) by Nat Van Gulck.
 
-PBI Inspector V2 uses JsonLogic (written in JSON) to express inspection rules that validate Power BI Report (PBIR) definitions and other Fabric CI/CD item definitions. This skill covers the anatomy of a rule, every custom operator, and a hands-on tutorial for creating rules from scratch.
+PBI Inspector V2 uses JsonLogic (written in JSON) to express inspection rules that validate Power BI Report (PBIR) definitions and other Fabric CI/CD item definitions.
 
 ## Structure of a Rules File
 
-A rules file is JSON. It starts with a `rules` array containing one or more rule objects:
+A rules file is JSON containing a `rules` array:
 
 ```json
 {
@@ -25,26 +27,18 @@ A rules file is JSON. It starts with a `rules` array containing one or more rule
 
 ## Anatomy of a Rule
 
-Each rule object has the following properties:
-
-```json
-{
-  "id": "UNIQUE_RULE_ID",
-  "name": "Human-readable name shown in HTML results with wireframe images",
-  "description": "Details to help understand what this rule does",
-  "logType": "error|warning(default)",
-  "itemType": "Report|CopyJob|Lakehouse|…|*|json",
-  "disabled": false,
-  "part": "Iterator — see below",
-  "test": [
-    { /* logic */ },
-    { /* optional data mapping */ },
-    /* expected result */
-  ],
-  "patch": [
-    "PartName",
-    [ /* JSON Patch operations */ ]
-  ]
+```SudoLang
+interface FabInspectorRule {
+  id: String             // unique identifier
+  name: String           // display name in HTML results with wireframes
+  description?: String   // longer explanation of what this rule checks
+  logType?: "error" | "warning"  // default: "warning"
+  itemType?: String      // Fabric item type from .platform file (e.g. Report, CopyJob, Lakehouse, "*" for cross-item, "json" for any JSON metadata)
+  disabled?: Boolean     // default: false
+  part?: String          // iterator expression — see Part Iterator
+  test: [Logic, DataMapping?, ExpectedResult]
+  patch?: [PartName, [PatchOperation]]
+  applyPatch?: Boolean   // set to true when patch is defined
 }
 ```
 
@@ -65,6 +59,17 @@ Each rule object has the following properties:
 ## Part Iterator
 
 The `part` property controls **what** the rule iterates over.
+
+```SudoLang
+interface PartIterator {
+  Constraints {
+    When part matches an array of items, the rule applies iteratively to each item.
+    For Power BI Reports, use reserved part names (case-sensitive).
+    For other Fabric items, use a regular expression to match file/folder paths.
+    Folder separators are normalised to ":" for cross-platform compatibility.
+  }
+}
+```
 
 ### Reserved Part Names (Power BI Reports — case-sensitive)
 
@@ -99,27 +104,29 @@ For non-report Fabric items (or to match files by name), supply a regular expres
 
 This matches paths like `C:\fabricproject\folder1\copyjob1.CopyJob\copyjob-content.json` (Windows) or `/home/fabricproject/folder1/copyjob1.CopyJob/copyjob-content.json` (Linux).
 
-If an array of items is matched, the rule is applied **iteratively** to each item.
-
 ## Test Definition
 
-A test is an array with two or three items:
+```SudoLang
+interface TestDefinition {
+  shape: [Logic, DataMapping?, ExpectedResult]
 
-```
-"test": [
-  { logic },
-  { optional data mapping },
-  expected result
-]
+  Constraints {
+    Logic is a JsonLogic expression — can return any JSON value.
+    DataMapping provides named variables as literal values or JSON Pointer path expressions (RFC 6901).
+    If DataMapping is omitted, the test array has only two items: logic and expected result.
+    ExpectedResult is the value the logic must produce for the test to pass.
+    Returning an array of failing items is often more useful than true/false — expected result is then [].
+  }
+}
 ```
 
 ### Test Logic
 
-The first element is a JsonLogic expression. It can return any JSON value — boolean, string, number, array, or object. While simple `true`/`false` results work, returning an array of failing items (e.g. visual names) is often more useful; the expected result is then an empty array `[]`.
+The first element is a JsonLogic expression. It can return any JSON value — boolean, string, number, array, or object.
 
 ### Data Mapping (Optional)
 
-The second element (when present) provides named variables as literal values or JSON Pointer path expressions (see [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)). If omitted, the test array has only two items: logic and expected result.
+The second element provides named variables as literal values or JSON Pointer path expressions:
 
 ```json
 "test": [
@@ -139,7 +146,20 @@ The last element is the value the logic must produce for the test to pass. Commo
 
 ## Patch Definition
 
-A rule can optionally define a `patch` to auto-fix failing items. Currently only Power BI Report parts are supported.
+```SudoLang
+interface PatchDefinition {
+  shape: [PartName, [PatchOperation]]
+
+  Constraints {
+    Currently only Power BI Report parts are supported.
+    PartName is one of the reserved Power BI part names.
+    Operations follow JSON Patch specification (RFC 6902).
+    Add "applyPatch": true to the rule object when using a patch.
+  }
+}
+```
+
+Example:
 
 ```json
 "patch": [
@@ -151,26 +171,20 @@ A rule can optionally define a `patch` to auto-fix failing items. Currently only
 ]
 ```
 
-Structure:
-
-```
-"patch": [
-  "PartName",
-  [ JSON Patch operations ]
-]
-```
-
-`PartName` is one of the reserved Power BI part names (e.g. `Report`, `Visuals`, `Pages`). The operations follow the JSON Patch specification ([RFC 6902](https://tools.ietf.org/html/rfc6902)).
-
-When using a patch, add `"applyPatch": true` to the rule object.
-
 # PBI Inspector Custom Operators
 
-PBI Inspector adds the following operators beyond those provided by the JsonLogic library.
+PBI Inspector adds the following operators beyond the built-in JsonLogic library.
 
-## `count`
+```SudoLang
+interface CustomOperators {
+  Constraints {
+    These operators extend JsonLogic and are available inside any rule's test logic.
+    They follow the same {"operator": [args]} pattern as standard JsonLogic.
+  }
+}
+```
 
-Counts the number of items in an array.
+## `count` — count items in an array
 
 ```json
 {
@@ -184,7 +198,7 @@ Counts the number of items in an array.
 }
 ```
 
-Nested example — filter entities that have locally defined measures:
+Nested example — filter entities with locally defined measures:
 
 ```json
 {
@@ -205,9 +219,9 @@ Nested example — filter entities that have locally defined measures:
 }
 ```
 
-## `diff`
+## `diff` — set difference of two arrays
 
-Accepts two JSON arrays, treats them as non-ordered sets, and returns the set difference (items in the first set but not the second).
+Accepts two JSON arrays as non-ordered sets. Returns items in the first set but not the second.
 
 ```json
 {
@@ -248,13 +262,13 @@ Real-world example — find unused custom visuals:
 }
 ```
 
-## `drillvar`
+## `drillvar` — parse stringified JSON via pointer
 
-Accepts a JSON pointer string and parses stringified JSON on the right of a `>` character. This operator was needed in V1 of PBI Inspector due to escaped JSON in `report.json`. It is less relevant for V2 but still useful for querying escaped JSON such as in Deneb custom visual definitions.
+Accepts a JSON pointer string and parses stringified JSON on the right of a `>` character. This operator was needed in V1 of PBI Inspector due to escaped JSON in `report.json`. Less relevant for V2 but still useful for querying escaped JSON such as in Deneb custom visual definitions.
 
-## `equalsets`
+## `equalsets` — test set equality
 
-Accepts two JSON arrays, treats them as non-ordered sets, and returns `true` if they are equal.
+Accepts two JSON arrays as non-ordered sets. Returns `true` if they are equal.
 
 ```json
 {
@@ -268,9 +282,9 @@ Accepts two JSON arrays, treats them as non-ordered sets, and returns `true` if 
 }
 ```
 
-## `filesize`
+## `filesize` — get file size in bytes
 
-Returns the file size in bytes. Accepts either a file path string or the output of a `partinfo` operator.
+Accepts a file path string or `partinfo` output. Returns file size in bytes.
 
 ```json
 {
@@ -285,9 +299,9 @@ Returns the file size in bytes. Accepts either a file path string or the output 
 }
 ```
 
-## `filetextsearchcount`
+## `filetextsearchcount` — count regex matches in a file
 
-Takes two parameters: a file path (or `partinfo` output) and a regular expression pattern. Returns the number of regex matches in the file.
+Takes a file path (or `partinfo` output) and a regular expression pattern. Returns the number of matches.
 
 ```json
 {
@@ -302,9 +316,9 @@ Takes two parameters: a file path (or `partinfo` output) and a regular expressio
 }
 ```
 
-## `intersection`
+## `intersection` — set intersection of two arrays
 
-Accepts two JSON arrays, treats them as non-ordered sets, and returns their intersection.
+Accepts two JSON arrays as non-ordered sets. Returns their intersection.
 
 ```json
 {
@@ -318,9 +332,9 @@ Accepts two JSON arrays, treats them as non-ordered sets, and returns their inte
 }
 ```
 
-## `part`
+## `part` — get file content of a Fabric CI/CD item
 
-Returns the file content of a Fabric CI/CD item. For Power BI Reports, use the reserved part names listed in [Part Iterator](#reserved-part-names-power-bi-reports--case-sensitive). For other items, supply a regex to match file paths.
+For Power BI Reports, use the reserved part names. For other items, supply a regex to match file paths.
 
 Example — filter visuals with drop shadows enabled:
 
@@ -393,9 +407,9 @@ If the parameter is an empty string, it uses the current part iteration from the
 }
 ```
 
-## `partinfo`
+## `partinfo` — get part metadata
 
-Similar to `part` but returns **metadata** about the part instead of its content.
+Similar to `part` but returns **metadata** instead of content.
 
 Folder metadata example:
 
@@ -421,9 +435,9 @@ File metadata example:
 }
 ```
 
-## `path`
+## `path` — JSONPath query
 
-Provides the ability to define a JSONPath expression to query the context JSON. Uses the [JsonPath.Net](https://docs.json-everything.net/path/basics/) implementation (see [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535.html)).
+Defines a JSONPath expression to query the context JSON. Uses [JsonPath.Net](https://docs.json-everything.net/path/basics/) ([RFC 9535](https://www.rfc-editor.org/rfc/rfc9535.html)).
 
 ```json
 {
@@ -448,9 +462,9 @@ Provides the ability to define a JSONPath expression to query the context JSON. 
 }
 ```
 
-## `query`
+## `query` — apply an operator to a JSON node
 
-Accepts a JSON node object and an operator to apply to it. Useful for querying a part and applying further logic.
+Accepts a JSON node object and an operator to apply. Useful for querying a part and applying further logic.
 
 ```json
 {
@@ -469,9 +483,9 @@ Accepts a JSON node object and an operator to apply to it. Useful for querying a
 }
 ```
 
-## `rectoverlap`
+## `rectoverlap` — detect overlapping rectangles
 
-Accepts a JSON array of rectangle records (with `name`, `x`, `y`, `width`, `height` properties) and an optional margin width. Returns an array of overlapping rectangle names (inflated by the margin).
+Accepts a JSON array of rectangle records (`name`, `x`, `y`, `width`, `height`) and an optional margin width. Returns overlapping rectangle names (inflated by the margin).
 
 ```json
 {
@@ -527,9 +541,9 @@ Accepts a JSON array of rectangle records (with `name`, `x`, `y`, `width`, `heig
 }
 ```
 
-## `strcontains`
+## `strcontains` — count regex matches in a string
 
-Accepts a search string and a regular expression. Returns the count of regex matches in the string.
+Accepts a search string and a regular expression. Returns the count of matches.
 
 ```json
 {
@@ -573,9 +587,9 @@ Real-world example — find pages with default "Page x" names:
 }
 ```
 
-## `symdiff`
+## `symdiff` — symmetric difference of two arrays
 
-Accepts two JSON arrays, treats them as non-ordered sets, and returns their symmetric difference (items in either set but not both).
+Accepts two JSON arrays as non-ordered sets. Returns items in either set but not both.
 
 ```json
 {
@@ -589,9 +603,9 @@ Accepts two JSON arrays, treats them as non-ordered sets, and returns their symm
 }
 ```
 
-## `torecord`
+## `torecord` — build a JSON object from key/value pairs
 
-Accepts an array of key/value pairs. Returns a JSON record (object).
+Accepts an array of alternating key/value pairs. Returns a JSON record (object).
 
 ```json
 {
@@ -615,7 +629,7 @@ Accepts an array of key/value pairs. Returns a JSON record (object).
 }
 ```
 
-## `tostring`
+## `tostring` — stringify a JSON node
 
 Accepts a JSON node and returns the equivalent stringified JSON.
 
@@ -631,9 +645,9 @@ Accepts a JSON node and returns the equivalent stringified JSON.
 }
 ```
 
-## `union`
+## `union` — set union of two arrays
 
-Accepts two JSON arrays, treats them as non-ordered sets, and returns their union.
+Accepts two JSON arrays as non-ordered sets. Returns their union.
 
 ```json
 {
@@ -691,7 +705,7 @@ Check that `"a"` equals `"a"` using the `==` operator:
 
 ## Nested Operations
 
-Nest operations so the output of the inner becomes the input of the outer:
+Nest operations — the output of the inner becomes the input of the outer:
 
 ```json
 {
@@ -883,3 +897,24 @@ For full rule file examples see the PBI-InspectorV2 repository:
 - [Fabric CopyJob Rules](https://raw.githubusercontent.com/NatVanG/PBI-InspectorV2/refs/heads/main/DocsExamples/Example-CopyJob-Rules.json)
 - [Cross Fabric Item Rule](https://raw.githubusercontent.com/NatVanG/PBI-InspectorV2/refs/heads/main/DocsExamples/Example-FabricCrossItem-Rules.json)
 - [Example Rules with Patches](https://raw.githubusercontent.com/NatVanG/PBI-InspectorV2/refs/heads/main/DocsExamples/Example-patches.json)
+
+# Rule Authoring Best Practices
+
+```SudoLang
+Constraints {
+  Every rule must have a unique id and descriptive name.
+  Prefer returning arrays of failing items over simple true/false — makes results actionable.
+  Use the part iterator to scope rules to specific report parts or Fabric item files.
+  Use data mapping to define JSON Pointer variables that simplify complex test logic.
+  Keep test logic focused on a single concern — compose multiple rules for complex checks.
+  Use logType "error" for critical issues, "warning" (default) for recommendations.
+  Set disabled: true during rule development, then enable when tested.
+  Add patches only for Power BI Report parts and only when the fix is deterministic.
+  Use strcontains with regex for flexible string matching.
+  Use set operators (diff, intersection, union, symdiff, equalsets) for comparing collections.
+  Use count to validate array sizes.
+  Use query to chain part access with further logic.
+  Use path with JSONPath expressions for deep traversal.
+  Use partinfo + filesize for non-JSON file checks.
+}
+```

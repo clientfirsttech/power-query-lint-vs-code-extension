@@ -4,22 +4,31 @@ description: JsonLogic rule engine documentation for building PBIR (Power BI Enh
 user-invokable: false
 ---
 
-# JsonLogic - Rule Engine for PBIR Report Validation
+# JsonLogic — Rule Engine for PBIR Report Validation
 
-JsonLogic is a small, safe way to represent one decision as a JSON object. It is used by FabInspector to build tests that validate PBIR (Power BI Enhanced Report) definitions in Power Reports. Because rules are pure data, they can be stored, shared, and evaluated deterministically with no side effects.
+You are an expert in JsonLogic, the JSON-based rule engine used by FabInspector to build deterministic tests that validate PBIR (Power BI Enhanced Report) definitions. You write, debug, and explain JsonLogic rules fluently.
 
 ## Why JsonLogic?
 
-- **Terse.** Rules are compact JSON objects.
-- **Consistent.** Every rule follows the pattern `{"operator": ["values" ...]}`. Always.
-- **Secure.** Rules are never `eval()`-ed. They have read-only access to the data you provide and no write access to anything.
-- **Flexible.** Easy to add new operators and build complex structures.
+JsonLogic is a small, safe way to represent one decision as a JSON object.
 
-JsonLogic has no setters, no loops, no functions or gotos. One rule leads to one decision, with no side effects and deterministic computation time.
+Constraints {
+  Rules are compact JSON objects — terse by design.
+  Every rule follows the pattern `{"operator": ["values" ...]}` — always consistent.
+  Rules are never eval()-ed — they have read-only data access with no write access — secure.
+  Easy to add new operators and build complex structures — flexible.
+  No setters, no loops, no functions, no gotos.
+  One rule → one decision, no side effects, deterministic computation time.
+}
 
 ## Rule Format
 
-A JsonLogic rule is a JSON object with a single key (the operator) whose value is an array of arguments. Each argument can be a string, number, boolean, array, null, or another rule.
+```SudoLang
+JsonLogicRule {
+  shape: { operator: [arg1, arg2, ...] }
+  Each argument can be a string, number, boolean, array, null, or another JsonLogicRule.
+}
+```
 
 ```json
 { "operator": ["value1", "value2"] }
@@ -29,11 +38,9 @@ A JsonLogic rule is a JSON object with a single key (the operator) whose value i
 
 ## Accessing Data
 
-### `var`
+### `var` — retrieve data from the provided data object
 
-Retrieve data from the provided data object.
-
-Most JsonLogic rules operate on data supplied at run-time. Typically this data is an object, in which case the argument to `var` is a property name.
+Most JsonLogic rules operate on data supplied at run-time. The argument to `var` is a property name.
 
 ```js
 jsonLogic.apply(
@@ -43,7 +50,7 @@ jsonLogic.apply(
 // 1
 ```
 
-Syntactic sugar lets you skip the array around single arguments:
+Syntactic sugar — skip the array around single arguments:
 
 ```js
 jsonLogic.apply(
@@ -53,7 +60,7 @@ jsonLogic.apply(
 // 1
 ```
 
-You can supply a default as the second argument, for values that might be missing in the data object. (Note, the skip-the-array sugar won't work here because you're passing two arguments to `var`):
+Supply a default as the second argument for values that might be missing:
 
 ```js
 // Rule: {"var":["z", 26]}
@@ -61,28 +68,15 @@ You can supply a default as the second argument, for values that might be missin
 // Result: 26
 ```
 
-The key passed to `var` can use dot-notation to get the property of a property (to any depth you need):
+Dot-notation — access nested properties to any depth:
 
 ```js
-// Rule
-{ "var" : "champ.name" }
-
-// Data
-{
-  "champ" : {
-    "name" : "Fezzig",
-    "height" : 223
-  },
-  "challenger" : {
-    "name" : "Dread Pirate Roberts",
-    "height" : 183
-  }
-}
-
+// Rule: { "var" : "champ.name" }
+// Data: { "champ": { "name": "Fezzig", "height": 223 }, "challenger": { "name": "Dread Pirate Roberts", "height": 183 } }
 // Result: "Fezzig"
 ```
 
-You can also use the `var` operator to access an array by numeric index:
+Numeric index — access array elements:
 
 ```js
 // Rule: {"var": 1}
@@ -90,7 +84,7 @@ You can also use the `var` operator to access an array by numeric index:
 // Result: "one"
 ```
 
-Here's a complex rule that mixes literals and data. The pie isn't ready to eat unless it's cooler than 110 degrees, *and* filled with apples.
+Complex rule — mix literals and data:
 
 ```js
 // Rule
@@ -99,28 +93,21 @@ Here's a complex rule that mixes literals and data. The pie isn't ready to eat u
   {"==" : [ { "var" : "pie.filling" }, "apple" ] }
 ] }
 
-// Data
-{ "temp" : 100, "pie" : { "filling" : "apple" } }
-
+// Data: { "temp" : 100, "pie" : { "filling" : "apple" } }
 // Result: true
 ```
 
-You can also use `var` with an empty string to get the entire data object — which is really useful in `map`, `filter`, and `reduce` rules.
+Empty string — get the entire data object (useful in map, filter, reduce):
 
 ```js
-// Rule
-{ "cat" : [
-    "Hello, ",
-    {"var":""}
-] }
-
+// Rule: { "cat" : [ "Hello, ", {"var":""} ] }
 // Data: "Dolly"
 // Result: "Hello, Dolly"
 ```
 
-### `missing`
+### `missing` — find keys absent from the data object
 
-Takes an array of data keys to search for (same format as `var`). Returns an array of any keys that are missing from the data object, or an empty array.
+Takes an array of data keys. Returns an array of any keys missing from the data, or `[]`.
 
 ```js
 // Rule: {"missing":["a", "b"]}
@@ -134,23 +121,17 @@ Takes an array of data keys to search for (same format as `var`). Returns an arr
 // Result: []
 ```
 
-Note, in JsonLogic empty arrays are falsy. So you can use `missing` with `if` like:
+In JsonLogic empty arrays are falsy, so combine `missing` with `if`:
 
 ```js
-// Rule
-{"if":[
-  {"missing":["a", "b"]},
-  "Not enough fruit",
-  "OK to proceed"
-]}
-
+// Rule: {"if":[ {"missing":["a", "b"]}, "Not enough fruit", "OK to proceed" ]}
 // Data: {"a":"apple", "b":"banana"}
 // Result: "OK to proceed"
 ```
 
-### `missing_some`
+### `missing_some` — require N of M keys
 
-Takes a minimum number of data keys that are required, and an array of keys to search for (same format as `var` or `missing`). Returns an empty array if the minimum is met, or an array of the missing keys otherwise.
+Takes a minimum count and an array of keys. Returns `[]` if minimum is met, otherwise the missing keys.
 
 ```js
 // Rule: {"missing_some":[1, ["a", "b", "c"]]}
@@ -164,7 +145,7 @@ Takes a minimum number of data keys that are required, and an array of keys to s
 // Result: ["b", "c"]
 ```
 
-This is useful if you're using `missing` to track required fields, but occasionally need to require N of M fields.
+Combined example — require first name, last name, and at least one phone number:
 
 ```js
 // Rule
@@ -183,21 +164,16 @@ This is useful if you're using `missing` to track required fields, but occasiona
 
 ## Logic and Boolean Operations
 
-### `if`
+### `if` — conditional branching
 
-The `if` statement typically takes 3 arguments: a condition (if), what to do if it's true (then), and what to do if it's false (else):
-
-```js
-// Rule: {"if" : [ true, "yes", "no" ]}
-// Result: "yes"
-```
+Takes 3 arguments (condition, then, else) or chains as if/then elseif/then … else:
 
 ```js
-// Rule: {"if" : [ false, "yes", "no" ]}
-// Result: "no"
+// Rule: {"if" : [ true, "yes", "no" ]}   → "yes"
+// Rule: {"if" : [ false, "yes", "no" ]}  → "no"
 ```
 
-`if` can also take more than 3 arguments, and will pair up arguments like if/then elseif/then elseif/then else:
+Chained:
 
 ```js
 // Rule
@@ -206,154 +182,93 @@ The `if` statement typically takes 3 arguments: a condition (if), what to do if 
   {"<": [{"var":"temp"}, 100] }, "liquid",
   "gas"
 ]}
-
 // Data: {"temp":55}
 // Result: "liquid"
 ```
 
-### `==`
-
-Tests equality, with type coercion. Requires two arguments.
+### `==` — equality with type coercion
 
 ```js
-// Rule: {"==" : [1, 1]}        → true
-// Rule: {"==" : [1, "1"]}      → true
-// Rule: {"==" : [0, false]}    → true
+// {"==" : [1, 1]}        → true
+// {"==" : [1, "1"]}      → true
+// {"==" : [0, false]}    → true
 ```
 
-### `===`
-
-Tests strict equality. Requires two arguments.
+### `===` — strict equality
 
 ```js
-// Rule: {"===" : [1, 1]}       → true
-// Rule: {"===" : [1, "1"]}     → false
+// {"===" : [1, 1]}       → true
+// {"===" : [1, "1"]}     → false
 ```
 
-### `!=`
-
-Tests not-equal, with type coercion.
+### `!=` — not-equal with type coercion
 
 ```js
-// Rule: {"!=" : [1, 2]}        → true
-// Rule: {"!=" : [1, "1"]}      → false
+// {"!=" : [1, 2]}        → true
+// {"!=" : [1, "1"]}      → false
 ```
 
-### `!==`
-
-Tests strict not-equal.
+### `!==` — strict not-equal
 
 ```js
-// Rule: {"!==" : [1, 2]}       → true
-// Rule: {"!==" : [1, "1"]}     → true
+// {"!==" : [1, 2]}       → true
+// {"!==" : [1, "1"]}     → true
 ```
 
-### `!`
-
-Logical negation ("not"). Takes just one argument.
+### `!` — logical negation
 
 ```js
-// Rule: {"!" : [true]}         → false
+// {"!" : [true]}         → false
+// {"!" : true}           → false   (unary sugar)
 ```
 
-*Note:* unary operators can also take a single, non-array argument:
+### `!!` — double negation (cast to boolean)
+
+JsonLogic truthiness: empty arrays are falsy, string "0" is truthy.
 
 ```js
-// Rule: {"!" : true}           → false
+// {"!!" : [ [] ] }       → false
+// {"!!" : ["0"] }        → true
 ```
 
-### `!!`
-
-Double negation, or "cast to a boolean." Takes a single argument.
-
-Note that JsonLogic has its own spec for truthy to ensure that rules will run consistently across interpreters. (e.g., empty arrays are falsy, string `"0"` is truthy.)
+### `or` — logical OR (returns first truthy or last argument)
 
 ```js
-// Rule: {"!!" : [ [] ] }       → false
-// Rule: {"!!" : ["0"] }        → true
+// {"or": [true, false]}    → true
+// {"or": [false, "a"]}     → "a"
+// {"or": [false, 0, "a"]}  → "a"
 ```
 
-### `or`
-
-`or` can be used for simple boolean tests, with 1 or more arguments.
+### `and` — logical AND (returns first falsy or last argument)
 
 ```js
-// Rule: {"or": [true, false]}  → true
-```
-
-At a more sophisticated level, `or` returns the first truthy argument, or the last argument.
-
-```js
-// Rule: {"or":[false, true]}     → true
-// Rule: {"or":[false, "a"]}      → "a"
-// Rule: {"or":[false, 0, "a"]}   → "a"
-```
-
-### `and`
-
-`and` can be used for simple boolean tests, with 1 or more arguments.
-
-```js
-// Rule: {"and": [true, true]}   → true
-// Rule: {"and": [true, false]}  → false
-```
-
-At a more sophisticated level, `and` returns the first falsy argument, or the last argument.
-
-```js
-// Rule: {"and":[true,"a",3]}    → 3
-// Rule: {"and": [true,"",3]}    → ""
+// {"and": [true, true]}   → true
+// {"and": [true, false]}  → false
+// {"and": [true,"a",3]}   → 3
+// {"and": [true,"",3]}    → ""
 ```
 
 ## Numeric Operations
 
-### `>`, `>=`, `<`, and `<=`
-
-Greater than:
+### Comparison: `>`, `>=`, `<`, `<=`
 
 ```js
-// Rule: {">" : [2, 1]}         → true
+// {">" : [2, 1]}   → true
+// {">=" : [1, 1]}  → true
+// {"<" : [1, 2]}   → true
+// {"<=" : [1, 1]}  → true
 ```
 
-Greater than or equal to:
+### Between — special 3-argument form of `<` and `<=`
 
 ```js
-// Rule: {">=" : [1, 1]}        → true
+// {"<" : [1, 2, 3]}   → true   (exclusive)
+// {"<" : [1, 1, 3]}   → false
+// {"<=" : [1, 2, 3]}  → true   (inclusive)
+// {"<=" : [1, 1, 3]}  → true
 ```
 
-Less than:
-
-```js
-// Rule: {"<" : [1, 2]}         → true
-```
-
-Less than or equal to:
-
-```js
-// Rule: {"<=" : [1, 1]}        → true
-```
-
-### Between
-
-You can use a special case of `<` and `<=` to test that one value is between two others:
-
-Between exclusive:
-
-```js
-// Rule: {"<" : [1, 2, 3]}      → true
-// Rule: {"<" : [1, 1, 3]}      → false
-// Rule: {"<" : [1, 4, 3]}      → false
-```
-
-Between inclusive:
-
-```js
-// Rule: {"<=" : [1, 2, 3]}     → true
-// Rule: {"<=" : [1, 1, 3]}     → true
-// Rule: {"<=" : [1, 4, 3]}     → false
-```
-
-This is most useful with data:
+With data:
 
 ```js
 // Rule: { "<": [0, {"var":"temp"}, 100]}
@@ -363,293 +278,174 @@ This is most useful with data:
 
 ### `max` and `min`
 
-Return the maximum or minimum from a list of values.
-
 ```js
-// Rule: {"max":[1,2,3]}        → 3
-// Rule: {"min":[1,2,3]}        → 1
+// {"max":[1,2,3]}  → 3
+// {"min":[1,2,3]}  → 1
 ```
 
-### Arithmetic: `+` `-` `*` `/`
-
-Addition, subtraction, multiplication, and division.
+### Arithmetic: `+`, `-`, `*`, `/`
 
 ```js
-// Rule: {"+":[4,2]}            → 6
-// Rule: {"-":[4,2]}            → 2
-// Rule: {"*":[4,2]}            → 8
-// Rule: {"/":[4,2]}            → 2
+// {"+":[4,2]}  → 6      {"-":[4,2]}  → 2
+// {"*":[4,2]}  → 8      {"/":[4,2]}  → 2
 ```
 
-Because addition and multiplication are associative, they happily take as many args as you want:
+Associative — take as many args as you want:
 
 ```js
-// Rule: {"+":[2,2,2,2,2]}      → 10
-// Rule: {"*":[2,2,2,2,2]}      → 32
+// {"+":[2,2,2,2,2]}  → 10
+// {"*":[2,2,2,2,2]}  → 32
 ```
 
-Passing just one argument to `-` returns its arithmetic negative (additive inverse).
+Unary `-` returns the additive inverse; unary `+` casts to number:
 
 ```js
-// Rule: {"-": 2 }              → -2
-// Rule: {"-": -2 }             → 2
+// {"-": 2 }       → -2
+// {"-": -2 }      → 2
+// {"+" : "3.14"}  → 3.14
 ```
 
-Passing just one argument to `+` casts it to a number.
+### `%` — modulo
 
 ```js
-// Rule: {"+" : "3.14"}         → 3.14
+// {"%": [101,2]}  → 1
 ```
 
-### `%`
-
-Modulo. Finds the remainder after the first argument is divided by the second argument.
-
-```js
-// Rule: {"%": [101,2]}         → 1
-```
-
-This can be paired with a loop in the language that parses JsonLogic to create stripes or other effects:
+Stripe pattern example:
 
 ```js
 var rule = {"if": [{"%": [{"var":"i"}, 2]}, "odd", "even"]};
 for(var i = 1; i <= 4 ; i++){
   console.log(i, jsonLogic.apply(rule, {"i":i}));
 }
-/* Outputs:
-1 "odd"
-2 "even"
-3 "odd"
-4 "even"
-*/
+// 1 "odd"  2 "even"  3 "odd"  4 "even"
 ```
 
 ## Array Operations
 
-### `map`, `reduce`, and `filter`
+### `map` — transform every element
 
-You can use `map` to perform an action on every member of an array. Note, that inside the logic being used to map, `var` operations are relative to the array element being worked on.
+Inside the logic, `var` is relative to the current array element.
 
 ```js
-// Rule
-{"map":[
-  {"var":"integers"},
-  {"*":[{"var":""},2]}
-]}
-
+// Rule: {"map":[ {"var":"integers"}, {"*":[{"var":""},2]} ]}
 // Data: {"integers":[1,2,3,4,5]}
 // Result: [2,4,6,8,10]
 ```
 
-You can use `filter` to keep only elements of the array that pass a test. Note, that inside the logic being used to filter, `var` operations are relative to the array element being worked on.
+### `filter` — keep elements passing a test
 
-Also note, the returned array will have contiguous indexes starting at zero (typical for JavaScript, Python and Ruby) — it will *not* preserve the source indexes.
+Inside the logic, `var` is relative to the current array element. Returned indexes are contiguous starting at zero.
 
 ```js
-// Rule
-{"filter":[
-  {"var":"integers"},
-  {"%":[{"var":""},2]}
-]}
-
+// Rule: {"filter":[ {"var":"integers"}, {"%":[{"var":""},2]} ]}
 // Data: {"integers":[1,2,3,4,5]}
 // Result: [1,3,5]
 ```
 
-You can use `reduce` to combine all the elements in an array into a single value, like adding up a list of numbers. Note, that inside the logic being used to reduce, `var` operations only have access to an object like:
+### `reduce` — combine elements into a single value
+
+Inside the logic, `var` has access to `current` (this element) and `accumulator` (progress so far).
 
 ```js
-{
-    "current" :     // this element of the array,
-    "accumulator" : // progress so far, or the initial value
-}
-```
-
-```js
-// Rule
-{"reduce":[
-    {"var":"integers"},
-    {"+":[{"var":"current"}, {"var":"accumulator"}]},
-    0
-]}
-
+// Rule: {"reduce":[ {"var":"integers"}, {"+":[{"var":"current"}, {"var":"accumulator"}]}, 0 ]}
 // Data: {"integers":[1,2,3,4,5]}
 // Result: 15
 ```
 
-### `all`, `none`, and `some`
+### `all`, `none`, `some` — array tests
 
-These operations take an array, and perform a test on each member of that array.
-
-The most interesting part of these operations is that inside the test code, `var` operations are relative to the array element being tested.
-
-It can be useful to use `{"var":""}` to get the entire array element within the test.
+Inside the test, `var` is relative to the current element. Use `{"var":""}` for the whole element.
 
 ```js
-// Rule: {"all" : [ [1,2,3], {">":[{"var":""}, 0]} ]}
-// Result: true
-
-// Rule: {"some" : [ [-1,0,1], {">":[{"var":""}, 0]} ]}
-// Result: true
-
-// Rule: {"none" : [ [-3,-2,-1], {">":[{"var":""}, 0]} ]}
-// Result: true
+// {"all" : [ [1,2,3], {">":[{"var":""}, 0]} ]}        → true
+// {"some" : [ [-1,0,1], {">":[{"var":""}, 0]} ]}      → true
+// {"none" : [ [-3,-2,-1], {">":[{"var":""}, 0]} ]}    → true
 ```
 
-Or it can be useful to test an object based on its properties:
+Test by property:
 
 ```js
-// Rule
-{"some" : [ {"var":"pies"}, {"==":[{"var":"filling"}, "apple"]} ]}
-
-// Data
-{"pies":[
-  {"filling":"pumpkin","temp":110},
-  {"filling":"rhubarb","temp":210},
-  {"filling":"apple","temp":310}
-]}
-
+// Rule: {"some" : [ {"var":"pies"}, {"==":[{"var":"filling"}, "apple"]} ]}
+// Data: {"pies":[ {"filling":"pumpkin","temp":110}, {"filling":"rhubarb","temp":210}, {"filling":"apple","temp":310} ]}
 // Result: true
 ```
 
-Note that `none` will return `true` for an empty array, while `all` and `some` will return `false`.
+Constraint: `none` returns true for an empty array; `all` and `some` return false for empty arrays.
 
-### `merge`
-
-Takes one or more arrays, and merges them into one array. If arguments aren't arrays, they get cast to arrays.
+### `merge` — flatten arrays
 
 ```js
-// Rule: {"merge":[ [1,2], [3,4] ]}
-// Result: [1,2,3,4]
-
-// Rule: {"merge":[ 1, 2, [3,4] ]}
-// Result: [1,2,3,4]
+// {"merge":[ [1,2], [3,4] ]}  → [1,2,3,4]
+// {"merge":[ 1, 2, [3,4] ]}  → [1,2,3,4]
 ```
 
-`merge` can be especially useful when defining complex `missing` rules, like which fields are required in a document. For example, this vehicle paperwork always requires the car's VIN, but only needs the APR and term if you're financing.
+Complex `missing` example — always require VIN, require APR + term only if financing:
 
 ```js
-// Rule
-{"missing" :
-  { "merge" : [
-    "vin",
-    {"if": [{"var":"financing"}, ["apr", "term"], [] ]}
-  ]}
-}
-
-// Data: {"financing":true}
-// Result: ["vin","apr","term"]
+// Rule: {"missing" : { "merge" : [ "vin", {"if": [{"var":"financing"}, ["apr", "term"], [] ]} ] } }
+// Data: {"financing":true}   → ["vin","apr","term"]
+// Data: {"financing":false}  → ["vin"]
 ```
 
-```js
-// Rule
-{"missing" :
-  { "merge" : [
-    "vin",
-    {"if": [{"var":"financing"}, ["apr", "term"], [] ]}
-  ]}
-}
-
-// Data: {"financing":false}
-// Result: ["vin"]
-```
-
-### `in`
-
-If the second argument is an array, tests that the first argument is a member of the array:
+### `in` — membership test (array)
 
 ```js
-// Rule: {"in":[ "Ringo", ["John", "Paul", "George", "Ringo"] ]}
-// Result: true
+// {"in":[ "Ringo", ["John", "Paul", "George", "Ringo"] ]}  → true
 ```
 
 ## String Operations
 
-### `in`
-
-If the second argument is a string, tests that the first argument is a substring:
+### `in` — substring test
 
 ```js
-// Rule: {"in":["Spring", "Springfield"]}
-// Result: true
+// {"in":["Spring", "Springfield"]}  → true
 ```
 
-### `cat`
-
-Concatenate all the supplied arguments. Note that this is not a join or implode operation, there is no "glue" string.
+### `cat` — concatenation
 
 ```js
-// Rule: {"cat": ["I love", " pie"]}
-// Result: "I love pie"
+// {"cat": ["I love", " pie"]}                                   → "I love pie"
+// {"cat": ["I love ", {"var":"filling"}, " pie"]}
+//   Data: {"filling":"apple"}                                    → "I love apple pie"
 ```
 
-```js
-// Rule: {"cat": ["I love ", {"var":"filling"}, " pie"]}
-// Data: {"filling":"apple", "temp":110}
-// Result: "I love apple pie"
-```
-
-### `substr`
-
-Get a portion of a string.
-
-Give a positive start position to return everything beginning at that index. (Indexes start at zero.)
+### `substr` — extract a portion of a string
 
 ```js
-// Rule: {"substr": ["jsonlogic", 4]}
-// Result: "logic"
-```
-
-Give a negative start position to work backwards from the end of the string, then return everything.
-
-```js
-// Rule: {"substr": ["jsonlogic", -5]}
-// Result: "logic"
-```
-
-Give a positive length to express how many characters to return.
-
-```js
-// Rule: {"substr": ["jsonlogic", 1, 3]}
-// Result: "son"
-```
-
-Give a negative length to stop that many characters before the end.
-
-```js
-// Rule: {"substr": ["jsonlogic", 4, -2]}
-// Result: "log"
+// {"substr": ["jsonlogic", 4]}      → "logic"   (from index 4)
+// {"substr": ["jsonlogic", -5]}     → "logic"   (last 5 chars)
+// {"substr": ["jsonlogic", 1, 3]}   → "son"     (3 chars from index 1)
+// {"substr": ["jsonlogic", 4, -2]}  → "log"     (stop 2 before end)
 ```
 
 ## Miscellaneous
 
-### `log`
+### `log` — debug logging
 
-Logs the first value to console, then passes it through unmodified. This can be especially helpful when debugging a large rule.
+Logs the first value to console, then passes it through unmodified:
 
 ```js
-// Rule: {"log":"apple"}
-// Console output: "apple"
-// Result: "apple"
+// {"log":"apple"}  → console: "apple", result: "apple"
 ```
 
 # PBIR Validation Patterns
 
-When building FabInspector tests for Power Reports, common patterns include:
+Common patterns when building FabInspector tests for Power Reports:
 
-### Validate a Property Exists
+### Validate a property exists
 
 ```json
 { "!": { "missing": ["visualType"] } }
 ```
 
-### Validate a Property Value
+### Validate a property value
 
 ```json
 { "==": [{ "var": "visualType" }, "barChart"] }
 ```
 
-### Combine Multiple Checks
+### Combine multiple checks
 
 ```json
 {
@@ -663,9 +459,11 @@ When building FabInspector tests for Power Reports, common patterns include:
 
 ## Best Practices
 
-- Keep rules small and focused on a single decision.
-- Use `var` with dot-notation paths to access nested PBIR properties (e.g., `"var": "config.singleVisual.visualType"`).
-- Prefer strict equality (`===`) when validating types matter.
-- Use `missing` to check for required fields before testing their values.
-- Compose rules with `and` / `or` to build compound validations.
-- Store rules as JSON so they can be versioned, shared, and audited.
+Constraints {
+  Keep rules small and focused on a single decision.
+  Use `var` with dot-notation paths to access nested PBIR properties (e.g., "var": "config.singleVisual.visualType").
+  Prefer strict equality (`===`) when type matters.
+  Use `missing` to check for required fields before testing their values.
+  Compose rules with `and` / `or` to build compound validations.
+  Store rules as JSON so they can be versioned, shared, and audited.
+}
