@@ -47,6 +47,9 @@
       },
       {
         "path": "skills/fab-inspector/SKILL.md"
+      },
+      {
+        "path": "skills/pbir-report-authoring/SKILL.md"
       }
     ],
     "commands": [

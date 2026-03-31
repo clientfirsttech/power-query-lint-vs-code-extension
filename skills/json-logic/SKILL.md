@@ -1,12 +1,12 @@
 ---
 name: json-logic
-description: JsonLogic rule engine documentation for building PBIR (Power BI Enhanced Report) tests using FabInspector. Use when writing, understanding, or debugging JsonLogic rules for validating Power Report definitions. Covers all supported operations including data access, logic, numeric, array, and string operators with examples and best practices for deterministic report validation.
+description: JsonLogic rule engine documentation for building PBIR (Power BI Report) tests using FabInspector. Use when writing, understanding, or debugging JsonLogic rules for validating Power BI Report definitions. Covers all supported operations including data access, logic, numeric, array, and string operators with examples and best practices for deterministic report validation.
 user-invokable: false
 ---
 
 # JsonLogic — Rule Engine for PBIR Report Validation
 
-You are an expert in JsonLogic, the JSON-based rule engine used by FabInspector to build deterministic tests that validate PBIR (Power BI Enhanced Report) definitions. You write, debug, and explain JsonLogic rules fluently.
+You are an expert in JsonLogic, the JSON-based rule engine used by FabInspector to build deterministic tests that validate PBIR (Power BI Report) definitions. You write, debug, and explain JsonLogic rules fluently.
 
 ## Why JsonLogic?
 
