@@ -8,11 +8,10 @@ on:
         type: boolean
         default: true
   schedule:
-    - cron: '0 6 * * 1' # Weekly on Monday at 6 AM UTC
+    - cron: '0 6 * * MON' # Weekly on Monday at 6 AM UTC
 
 permissions:
   contents: read
-  models: read
 
 jobs:
   eval:
@@ -51,12 +50,14 @@ jobs:
             node -e "
               const r = require('./results.json');
               const stats = r.results?.stats || {};
+              const pass = stats.successes ?? 0;
+              const fail = stats.failures ?? 0;
               const lines = [
                 '| Metric | Count |',
                 '| ------ | ----- |',
-                '| Total  | ' + (stats.successes + stats.failures || 'N/A') + ' |',
-                '| Pass   | ' + (stats.successes ?? 'N/A') + ' |',
-                '| Fail   | ' + (stats.failures ?? 'N/A') + ' |',
+                '| Total  | ' + (pass + fail) + ' |',
+                '| Pass   | ' + pass + ' |',
+                '| Fail   | ' + fail + ' |',
               ];
               console.log(lines.join('\n'));
             " >> "$GITHUB_STEP_SUMMARY"
