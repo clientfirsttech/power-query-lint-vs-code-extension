@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: 'Power Query Lint – Agent & Skill Evaluation Suite'
+
+# ---------------------------------------------------------------------------
+# Prompts
+# ---------------------------------------------------------------------------
+# The prompt function dynamically loads the agent/skill system-prompt file
+# based on the "agent" column in the CSV and pairs it with the user prompt.
+prompts:
+  - file://prompt-function.js
+
+# ---------------------------------------------------------------------------
+# Providers
+# ---------------------------------------------------------------------------
+# Primary: built-in OpenAI-compatible provider targeting GitHub Models API.
+# Authentication uses GITHUB_TOKEN (set via `gh auth token` locally or
+# provided automatically in GitHub Actions).
+providers:
+  - id: openai:chat:gpt-4o
+    label: github-models-gpt4o
+    config:
+      apiBaseUrl: https://models.inference.ai.azure.com
+      apiKey: '{{env.GITHUB_TOKEN}}'
+      temperature: 0.2
+      max_tokens: 2048
+
+  # Alternative: custom provider that authenticates via `gh` CLI directly.
+  # Uncomment the line below and comment out the openai provider above to use.
+  # - id: file://providers/gh-cli-provider.js
+  #   config:
+  #     model: gpt-4o
+  #     temperature: 0.2
+  #     max_tokens: 2048
+
+# ---------------------------------------------------------------------------
+# Default test settings (applied to every test case)
+# ---------------------------------------------------------------------------
+defaultTest:
+  assert:
+    - type: cost
+      threshold: 0.10
+    - type: latency
+      threshold: 60000
+
+# ---------------------------------------------------------------------------
+# Test cases – loaded from CSV
+# ---------------------------------------------------------------------------
+# CSV columns: __description, agent, prompt, __expected
+tests: file://test-cases.csv
