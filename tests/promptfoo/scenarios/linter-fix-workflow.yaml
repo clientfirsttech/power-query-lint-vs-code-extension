@@ -1,0 +1,39 @@
+# Multi-turn dialogue: Power Query Linter fix workflow
+# Tests the full cycle: analyze code → apply fixes → explain changes
+- config:
+    - vars:
+        agent: power-query-linter
+  tests:
+    - description: "Linter dialogue T1: Ask linter to analyze Power Query code"
+      vars:
+        prompt: >-
+          Analyze this Power Query expression for lint issues:
+          let Source = Excel.Workbook(File.Contents("data.xlsx")),
+          Sheet1 = Source{[Item="Sheet1"]}[Data] in Sheet1
+      assert:
+        - type: icontains
+          value: lint
+        - type: javascript
+          value: "output.split(' ').length > 20"
+
+    - description: "Linter dialogue T2: Ask for corrected code"
+      vars:
+        prompt: "Apply the fixes you suggested. Show me the corrected Power Query code."
+      assert:
+        - type: icontains
+          value: let
+        - type: llm-rubric
+          value: >-
+            The response provides corrected Power Query code and references
+            specific issues identified in the previous turn of the conversation.
+
+    - description: "Linter dialogue T3: Ask for explanation of changes"
+      vars:
+        prompt: "Explain why each change was necessary and what best practice it follows."
+      assert:
+        - type: javascript
+          value: "output.split(' ').length > 30"
+        - type: llm-rubric
+          value: >-
+            The response explains the reasoning behind each fix, referring back
+            to the original issues found in Turn 1 of the conversation.

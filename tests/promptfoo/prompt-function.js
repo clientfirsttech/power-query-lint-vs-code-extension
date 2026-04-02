@@ -4,6 +4,11 @@
  * Dynamically loads the system prompt from the agent or skill markdown file
  * indicated by the `agent` test variable, and pairs it with the user prompt.
  *
+ * For multi-turn scenario tests, the `_conversation` variable (automatically
+ * populated by promptfoo when tests share a conversationId) contains prior
+ * turns. These are injected between the system prompt and the new user message
+ * so the model sees the full dialogue history.
+ *
  * Returns a chat-messages array consumed by the OpenAI-compatible provider.
  */
 
@@ -32,8 +37,25 @@ module.exports = async function ({ vars }) {
 
   const systemPrompt = fs.readFileSync(path.join(ROOT, relPath), 'utf-8');
 
-  return [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: vars.prompt },
-  ];
+  const messages = [{ role: 'system', content: systemPrompt }];
+
+  // Append prior conversation turns for multi-turn scenario tests.
+  // promptfoo sets `_conversation` automatically when tests share a conversationId.
+  if (Array.isArray(vars._conversation)) {
+    for (const turn of vars._conversation) {
+      // Each turn has { input, output } from the previous test step.
+      // `input` is the rendered prompt (string or message array) sent to the provider.
+      // `output` is the assistant response text.
+      if (typeof turn.input === 'string') {
+        messages.push({ role: 'user', content: turn.input });
+      }
+      if (typeof turn.output === 'string') {
+        messages.push({ role: 'assistant', content: turn.output });
+      }
+    }
+  }
+
+  messages.push({ role: 'user', content: vars.prompt });
+
+  return messages;
 };

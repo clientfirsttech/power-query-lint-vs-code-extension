@@ -60,8 +60,9 @@ To set up promptfoo with GitHub Models in a new project:
 ```
 tests/promptfoo/
   promptfooconfig.yaml   # Main config
-  prompt-function.js     # Dynamic system prompt loader
-  test-cases.csv         # Test matrix (CSV)
+  prompt-function.js     # Dynamic system prompt loader (supports multi-turn)
+  test-cases.csv         # Single-turn test matrix (CSV)
+  scenarios/             # Multi-turn dialogue tests (YAML)
   providers/
     gh-cli-provider.js   # (Optional) Custom provider
 ```
@@ -92,13 +93,24 @@ defaultTest:
       threshold: 0.10
     - type: latency
       threshold: 60000
+  # Grader model for llm-rubric assertions (uses same GitHub Models endpoint)
+  options:
+    provider:
+      id: openai:chat:gpt-4o-mini
+      config:
+        apiBaseUrl: https://models.inference.ai.azure.com
+        apiKey: '{{env.GITHUB_TOKEN}}'
 
 tests: file://test-cases.csv
+
+# Multi-turn dialogue tests (optional)
+scenarios:
+  - file://scenarios/your-dialogue.yaml
 ```
 
 ### 3. Create the prompt function
 
-The prompt function maps agent/skill identifiers to their system prompt files:
+The prompt function maps agent/skill identifiers to their system prompt files and supports multi-turn conversation history:
 
 ```javascript
 const fs = require('fs');
@@ -117,10 +129,18 @@ module.exports = async function ({ vars }) {
     throw new Error(`Unknown agent/skill "${agent}". Valid: ${Object.keys(AGENT_MAP).join(', ')}`);
   }
   const systemPrompt = fs.readFileSync(path.join(ROOT, relPath), 'utf-8');
-  return [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: vars.prompt },
-  ];
+  const messages = [{ role: 'system', content: systemPrompt }];
+
+  // Multi-turn: inject prior conversation history from scenarios
+  if (Array.isArray(vars._conversation)) {
+    for (const turn of vars._conversation) {
+      if (typeof turn.input === 'string') messages.push({ role: 'user', content: turn.input });
+      if (typeof turn.output === 'string') messages.push({ role: 'assistant', content: turn.output });
+    }
+  }
+
+  messages.push({ role: 'user', content: vars.prompt });
+  return messages;
 };
 ```
 
@@ -168,6 +188,8 @@ npm run promptfoo:view
 
 ## Test Cases
 
+### Single-Turn Tests (CSV)
+
 Tests are in `test-cases.csv` with columns:
 
 | Column | Purpose |
@@ -182,3 +204,70 @@ Current coverage: 15 test cases across 4 agents/skills:
 - `power-query-tester` (5 tests)
 - `pql-assert` (2 tests)
 - `dax-query-guidelines` (3 tests)
+
+### Multi-Turn Dialogue Tests (Scenarios)
+
+Dialogue tests live in `scenarios/*.yaml` and use promptfoo's native `scenarios` feature. Each scenario defines a 2-4 turn conversation where tests share a `conversationId` and the `_conversation` variable accumulates the full message history.
+
+#### How it works
+
+1. **Scenarios are sequential** — tests within a scenario run in order; each turn sees all prior assistant responses via `_conversation`
+2. **The prompt function** (`prompt-function.js`) injects conversation history between the system prompt and the new user message, building the full chat context
+3. **Different scenarios run in parallel** — only turns _within_ a scenario are sequential
+
+#### Directory layout
+
+```
+scenarios/
+  linter-fix-workflow.yaml    # power-query-linter: analyze → fix → explain
+  tester-create-test.yaml     # power-query-tester: environment → create → register
+  skill-deep-dive.yaml        # pql-assert: list functions → detail → example
+  dax-query-building.yaml     # dax-query-guidelines: DEFINE → SUMMARIZECOLUMNS → complete query
+```
+
+#### Scenario file format
+
+```yaml
+- config:
+    - vars:
+        agent: <agent-or-skill-id>    # Same values as CSV "agent" column
+  tests:
+    - description: "Turn 1: Initial question"
+      vars:
+        prompt: "First user message"
+      assert:
+        - type: icontains           # Deterministic assertions (cheap, reliable)
+          value: expected-keyword
+
+    - description: "Turn 2: Follow-up"
+      vars:
+        prompt: "Second user message referencing Turn 1"
+      assert:
+        - type: llm-rubric          # Model-graded assertion for conversation coherence
+          value: "Response references specific details from Turn 1"
+```
+
+#### Assertions strategy
+
+| Turn | Assertion types | Purpose |
+|------|----------------|---------|
+| Turn 1 | `icontains`, `contains-all`, `javascript` | Verify domain keywords and response length |
+| Turn 2-3 | `icontains` + `llm-rubric` | Verify keywords AND conversation coherence |
+| All turns | `cost`, `latency` (from `defaultTest`) | Guard against cost/latency regressions |
+
+#### Grading model
+
+The `llm-rubric` assertions use `gpt-4o-mini` via GitHub Models (configured in `defaultTest.options.provider`). This keeps grading costs low while maintaining scoring quality.
+
+#### Adding a new scenario
+
+1. Create `scenarios/<name>.yaml` following the format above
+2. Add the file reference to `promptfooconfig.yaml` under `scenarios:`
+   ```yaml
+   scenarios:
+     - file://scenarios/<name>.yaml
+   ```
+3. Run `npm run promptfoo:validate` to check syntax
+4. Run `GITHUB_TOKEN=$(gh auth token) npm run promptfoo:eval` to execute
+
+Current scenario coverage: 4 scenarios, 12 dialogue turns total.

@@ -6,6 +6,8 @@ description: 'Power Query Lint – Agent & Skill Evaluation Suite'
 # ---------------------------------------------------------------------------
 # The prompt function dynamically loads the agent/skill system-prompt file
 # based on the "agent" column in the CSV and pairs it with the user prompt.
+# For multi-turn scenarios it also injects prior conversation history via
+# the `_conversation` variable that promptfoo populates automatically.
 prompts:
   - file://prompt-function.js
 
@@ -41,9 +43,30 @@ defaultTest:
       threshold: 0.10
     - type: latency
       threshold: 60000
+  # Pin the grader model for llm-rubric assertions to keep costs low and
+  # scoring stable across runs. Uses the same GitHub Models endpoint as
+  # the main provider.
+  options:
+    provider:
+      id: openai:chat:gpt-4o-mini
+      config:
+        apiBaseUrl: https://models.inference.ai.azure.com
+        apiKey: '{{env.GITHUB_TOKEN}}'
 
 # ---------------------------------------------------------------------------
-# Test cases – loaded from CSV
+# Test cases – single-turn (loaded from CSV)
 # ---------------------------------------------------------------------------
 # CSV columns: __description, agent, prompt, __expected
 tests: file://test-cases.csv
+
+# ---------------------------------------------------------------------------
+# Scenarios – multi-turn dialogue tests
+# ---------------------------------------------------------------------------
+# Each scenario file defines a conversation with 2-4 sequential turns.
+# Tests within a scenario share a conversationId so the prompt function
+# receives the full dialogue history via the `_conversation` variable.
+scenarios:
+  - file://scenarios/linter-fix-workflow.yaml
+  - file://scenarios/tester-create-test.yaml
+  - file://scenarios/skill-deep-dive.yaml
+  - file://scenarios/dax-query-building.yaml
