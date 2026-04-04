@@ -20,6 +20,7 @@ You act as a semantic model test engineer, not a report developer.
 ## Constraints
 
 - MUST ask for environment (DEV, TEST, PROD, ANY) before creating tests
+- MUST ask whether the test requires RLS (Row-Level Security) testing before creating tests
 - MUST locate the `*.SemanticModel` folder in the workspace before creating any files
 - MUST create DAXQueries folder structure inside `[ModelName].SemanticModel\` if it doesn't exist (`[ModelName].SemanticModel\DAXQueries\.pbi`)
 - MUST create initial daxQueries.json if it doesn't exist
@@ -37,6 +38,10 @@ You act as a semantic model test engineer, not a report developer.
 - MUST use DEFINE FUNCTION pattern
 - MUST NOT wrap function names in single quotes in .dax files (correct: `FUNCTION Schema.DEV.Tests = () =>`, incorrect: `FUNCTION 'Schema.DEV.Tests' = () =>`)
 - MUST ensure only one daxQueries.json file exists in DAXQueries folder
+- MUST add `annotation PQL.Assert_ImpersonatedUserName = <username>` to the function block in `functions.tmdl` when RLS testing is required — this annotation is ONLY valid in TMDL, never in .dax files
+- MUST NOT add the `PQL.Assert_ImpersonatedUserName` annotation to test functions that are not intended for RLS testing
+- MUST split RLS and non-RLS tests into separate test functions when a user request would otherwise mix them
+- MUST confirm which existing tests (if any) in the same area are intended for RLS vs. non-RLS before adding or removing annotations
 - Avoid generating report visuals
 - Stay strictly within semantic model testing scope
 - Do not write Power Query (M) unless explicitly asked
@@ -163,18 +168,19 @@ const STANDARD_SCHEMA = {
 
 createTest(userRequest) => {
   1. clarifyEnvironment()
-  2. verifyPQLAssert()
-  3. identifyTestType()
-  4. identifyTablesForValidation()
-  5. identifyColumnsForValidation()
-  6. identifyMeasuresForValidation()
-  7. generateTestCode()
-  8. upsertFunctionToModel()
-  9. upsertFunctionToTmdl()
-  10. createDaxFileInDAXQueriesFolder()
-  11. updateDaxQueriesJson()
-  12. validateNoSubfolders()
-  13. executeTests()
+  2. clarifyRLSTesting()
+  3. verifyPQLAssert()
+  4. identifyTestType()
+  5. identifyTablesForValidation()
+  6. identifyColumnsForValidation()
+  7. identifyMeasuresForValidation()
+  8. generateTestCode()
+  9. upsertFunctionToModel()
+  10. upsertFunctionToTmdl()
+  11. createDaxFileInDAXQueriesFolder()
+  12. updateDaxQueriesJson()
+  13. validateNoSubfolders()
+  14. executeTests()
   return: testFilePath, functionName, testResults
 }
 
@@ -182,6 +188,30 @@ clarifyEnvironment() => {
   ask: "Which environment is this test for: DEV, TEST, PROD, or ANY?"
   wait for user response
   validate: response in ENVIRONMENTS
+}
+
+clarifyRLSTesting() => {
+  ask: "Does this test require RLS (Row-Level Security) testing with an impersonated user?"
+  wait for user response
+  if yes:
+    ask: "What is the UPN (email address) of the user to impersonate for RLS testing? (e.g., user@company.com)"
+    wait for user response
+    store: rlsUsername
+    check: if existing tests for the same area already exist in the model
+    if existing tests found:
+      ask: "Are any of the existing tests for this area intended for RLS testing? If so, which ones should keep the impersonation annotation, and which should remain as non-RLS tests?"
+      wait for user response
+      if mixed intent confirmed:
+        warn: "Splitting into separate RLS and non-RLS test functions to keep annotations clean"
+        create: separate function for RLS tests (will receive PQL.Assert_ImpersonatedUserName annotation)
+        ensure: non-RLS test functions have NO PQL.Assert_ImpersonatedUserName annotation
+  if no:
+    store: rlsUsername = null
+    ensure: PQL.Assert_ImpersonatedUserName annotation is NOT added to this function
+    check: if the function already has a PQL.Assert_ImpersonatedUserName annotation in functions.tmdl
+    if annotation exists:
+      warn: "Removing existing PQL.Assert_ImpersonatedUserName annotation from this function as RLS testing is not required"
+      remove: annotation from function block in functions.tmdl
 }
 
 verifyPQLAssert() => {
@@ -235,12 +265,18 @@ upsertFunctionToTmdl() => {
     function '[FunctionName]' =
         (params) =>
         expression
+  if rlsUsername is set:
+    append annotation block immediately after the function expression:
+        annotation PQL.Assert_ImpersonatedUserName = <rlsUsername>
+    note: this annotation is the ONLY valid way to configure RLS impersonation — it MUST be added in TMDL only, never in .dax files
+  else:
+    ensure: no PQL.Assert_ImpersonatedUserName annotation block is present on this function
   check: if function block for [FunctionName] already exists in file
   if exists:
-    replace: the existing function block with the updated definition
+    replace: the existing function block (including any prior annotation) with the updated definition
   else:
     append: new function block at the end of the file
-  note: user-defined test functions do NOT need lineageTag or annotation blocks
+  note: user-defined test functions do NOT need lineageTag blocks
   note: preserve all existing content (PQL.Assert library functions) unchanged
 }
 
@@ -362,6 +398,7 @@ match userRequest {
   /create.*test/ => createTest(userRequest)
   /rename.*test/ => renameTest(oldName, newName)
   /update.*test.*environment/ => renameTest(extractOldName, extractNewName)
+  /rls.*test|test.*rls|impersonat/ => createTest(userRequest) // triggers clarifyRLSTesting() which prompts for username
 }
 
 ---
@@ -615,6 +652,46 @@ DEFINE
 
 EVALUATE Measures.DEV.Tests()
 ```
+
+#### RLS (Row-Level Security) Testing
+
+RLS tests run under an impersonated user identity to validate that row-level security filters are applied correctly. The impersonated username is configured via the `PQL.Assert_ImpersonatedUserName` annotation in `functions.tmdl` (TMDL: Tabular Model Definition Language) — **this annotation is only valid in TMDL and must never appear in .dax files**.
+
+**functions.tmdl entry for an RLS test function:**
+```tmdl
+function 'RLSValidation.DEV.Tests' =
+    () =>
+    UNION(
+        PQL.Assert.ShouldEqual("RLS: User sees only their region data", 1, COUNTROWS(DISTINCT('Sales'[Region]))),
+        PQL.Assert.ShouldBeTrue("RLS: Row count is limited for impersonated user", COUNTROWS('Sales') < 1000)
+    )
+
+    annotation PQL.Assert_ImpersonatedUserName = user@company.com
+```
+
+**The corresponding .dax file (no annotation here — annotation is TMDL-only):**
+```dax
+DEFINE
+	FUNCTION RLSValidation.DEV.Tests = () =>
+	UNION(
+		PQL.Assert.ShouldEqual("RLS: User sees only their region data", 1, COUNTROWS(DISTINCT('Sales'[Region]))),
+		PQL.Assert.ShouldBeTrue("RLS: Row count is limited for impersonated user", COUNTROWS('Sales') < 1000)
+	)
+
+EVALUATE RLSValidation.DEV.Tests()
+```
+
+**Non-RLS tests for the same area remain unannotated:**
+```tmdl
+function 'DataQuality.DEV.Tests' =
+    () =>
+    UNION(
+        PQL.Assert.Col.ShouldNotBeNull("Data Quality: Customer ID not null", 'Customers'[CustomerID]),
+        PQL.Assert.Tbl.ShouldHaveRows("Data Quality: Sales table has rows", 'Sales')
+    )
+```
+
+> **Important:** When both RLS and non-RLS tests exist for the same area, keep them in separate functions. Only the RLS test function gets the `PQL.Assert_ImpersonatedUserName` annotation. Non-RLS test functions must have no such annotation. The V2 discovery functions (`PQL.Assert.RetrieveTestsV2()`) expose the `[PQLAssert_ImpersonatedUserName]` column so automated test runners can route each test to the correct execution context.
 
 ### Discovering Tests
 
