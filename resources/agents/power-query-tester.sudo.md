@@ -143,7 +143,7 @@ function 'Schema.ANY.Tests' =
 
 **Schema.ANY.Tests.dax** (function call only):
 ```dax
-EVALUATE 'Schema.ANY.Tests'()
+EVALUATE Schema.ANY.Tests()
 ```
 
 ### Common Mistakes to Avoid
@@ -155,21 +155,15 @@ EVALUATE Schema.ANY.Tests()
 ```
 **Error:** `The syntax for '(' is incorrect`
 
-❌ **WRONG** - Missing quotes on dotted names:
+✅ **CORRECT** - Simple function call only:
 ```dax
 EVALUATE Schema.ANY.Tests()
 ```
-**Error:** `The syntax for '(' is incorrect`
-
-✅ **CORRECT** - Simple function call with quotes:
-```dax
-EVALUATE 'Schema.ANY.Tests'()
-```
 
 ### Quoting Rules
-- Function names with dots → **must** use single quotes: `'Schema.ANY.Tests'()`
-- Simple names (no dots) → quotes optional: `MyTest()` or `'MyTest'()`
-- **Best practice:** Always quote for consistency
+- Function names are called directly without quotes: `Schema.ANY.Tests()`
+- No single quotes needed in EVALUATE statements
+- Single quotes are only used in function **definitions** in functions.tmdl, not in query calls
 
 ### Why This Matters
 TMDL-based models (compatibility level ≥ 1702) define functions once in `functions.tmdl`. The `.dax` query files should **ONLY call** these functions, not redefine them. Redefining causes syntax errors because the function already exists.
@@ -185,7 +179,7 @@ code := generateTestCode("schema", ["MarvelFact", "DateDim"], "ANY")
 # {
 #   functionName: "Schema.ANY.Tests",
 #   definition: "function 'Schema.ANY.Tests' = () => UNION(...)",
-#   queryCall: "EVALUATE 'Schema.ANY.Tests'()",
+#   queryCall: "EVALUATE Schema.ANY.Tests()",
 #   environment: "ANY"
 # }
 ```
@@ -206,7 +200,7 @@ function 'Schema.ANY.Tests' =
 
 **Step 3: Create Schema.ANY.Tests.dax File**
 ```dax
-EVALUATE 'Schema.ANY.Tests'()
+EVALUATE Schema.ANY.Tests()
 ```
 
 **Step 4: Update daxQueries.json**
@@ -247,7 +241,7 @@ EVALUATE 'Schema.ANY.Tests'()
 - **MUST instruct user to close/reopen .pbip file after function changes**
 - **MUST verify connection before executing any DAX queries**
 - **MUST create .dax files with ONLY EVALUATE statement (no DEFINE FUNCTION)**
-- **MUST quote function names with dots in .dax files** (e.g., 'Schema.ANY.Tests')
+- **MUST call functions directly without quotes in EVALUATE statements** (e.g., EVALUATE Schema.ANY.Tests())
 - MUST NOT modify production measures or schema
 - MUST return complete DAX queries
 - MUST use `DEFINE FUNCTION` in functions.tmdl only
@@ -294,6 +288,10 @@ TEST_CATEGORIES_BY_ENV = {
 NAMING_FORMAT = "[Area].[Environment].Test(s)"
 
 RESERVED_DAX_WORDS_FILE = "skills/pql-assert/references/reserved-dax-words.md"
+
+# MCP Server Results Directory (for automated test result retrieval)
+# Use %TEMP% environment variable to resolve user-specific temp directory
+POWERBI_MCP_RESULTS_DIR = "%TEMP%\\PowerBIModelingMCP\\QueryResults"
 
 # Common DAX reserved words to check (full list in reserved-dax-words.md)
 COMMON_RESERVED_WORDS = [
@@ -825,6 +823,144 @@ function installPQLAssert():
   
   return true
 
+function expandEnvironmentVariables(path):
+  # Expands environment variables like %TEMP%, %USERPROFILE%, etc.
+  # In PowerShell context: resolves to actual user-specific paths
+  # Example: %TEMP% -> C:\Users\<CurrentUser>\AppData\Local\Temp
+  return [System.Environment]::ExpandEnvironmentVariables(path)
+
+function executeAndRetrieveTests(testFunctionName):
+  # Step 1: Execute the DAX query
+  notify("▶️ Executing " + testFunctionName + "...")
+  
+  response := call_tool("mcp_powerbi-model_dax_query_operations", {
+    operation: "Execute",
+    query: "EVALUATE " + testFunctionName + "()",
+    maxRows: 1000
+  })
+  
+  # Step 2: Verify execution success
+  if not response.success:
+    halt "Query execution failed: " + response.message
+  
+  # Step 3: Access results directory
+  # Expand environment variable to get actual path
+  resultsDir := expandEnvironmentVariables(POWERBI_MCP_RESULTS_DIR)
+  
+  if not exists(resultsDir):
+    halt """
+    ⚠️ RESULTS DIRECTORY NOT FOUND
+    
+    Expected location: """ + resultsDir + """
+    
+    Possible causes:
+    1. MCP server hasn't executed any queries yet
+    2. Temp directory was cleaned
+    3. MCP server is using a different location
+    
+    Try executing a simple test query to initialize the directory.
+    """
+  
+  # Step 4: List all CSV result files
+  allFiles := list_dir(resultsDir)
+  csvFiles := filter(allFiles, (f) => startsWith(f.name, "dax_query_result_") && endsWith(f.name, ".csv"))
+  
+  # Step 5: Get the most recent file (by filename timestamp)
+  if csvFiles.length == 0:
+    halt "No result files found after execution"
+  
+  sortedFiles := sortDescending(csvFiles, by: "name")  # Sort by timestamp in filename
+  latestFile := resultsDir + "\\" + sortedFiles[0].name
+  
+  # Step 6: Read the CSV content
+  notify("📊 Parsing test results...")
+  csvContent := read_file(latestFile, startLine: 1, endLine: 1000)
+  
+  # Step 7: Parse and format results
+  results := parseCsvToTable(csvContent)
+  formattedOutput := formatTestResults(results)
+  
+  notify("✅ Test execution complete!")
+  
+  return formattedOutput
+
+function parseCsvToTable(csvContent):
+  lines := split(csvContent, "\n")
+  
+  if lines.length < 2:
+    halt "CSV file is empty or invalid"
+  
+  # Skip header row (assume first row is: TestName,Expected,Actual,Passed)
+  rows := []
+  
+  for i from 1 to lines.length - 1:
+    line := trim(lines[i])
+    if line != "":
+      row := parseCsvRow(line)
+      if row.length >= 4:
+        rows.append({
+          TestName: row[0],
+          Expected: row[1],
+          Actual: row[2],
+          Passed: row[3]
+        })
+  
+  return rows
+
+function parseCsvRow(line):
+  # Handle CSV with quoted fields containing commas
+  fields := []
+  currentField := ""
+  inQuotes := false
+  
+  for char in line:
+    if char == '"':
+      inQuotes := not inQuotes
+    else if char == ',' && not inQuotes:
+      fields.append(trim(currentField))
+      currentField := ""
+    else:
+      currentField += char
+  
+  fields.append(trim(currentField))  # Add last field
+  
+  return fields
+
+function formatTestResults(rows):
+  if rows.length == 0:
+    return "No test results found."
+  
+  passCount := 0
+  failCount := 0
+  
+  output := "## Test Results - " + rows.length + " tests\n\n"
+  output += "| TestName | Expected | Actual | Passed |\n"
+  output += "|----------|----------|--------|--------|\n"
+  
+  for row in rows:
+    # Format passed column with emoji
+    passedDisplay := if (row.Passed == "True" || row.Passed == "TRUE" || row.Passed == "true") 
+                     then "✅ True" 
+                     else "❌ False"
+    
+    if row.Passed == "True" || row.Passed == "TRUE" || row.Passed == "true":
+      passCount++
+    else:
+      failCount++
+    
+    output += "| " + row.TestName + " | " + row.Expected + " | " + row.Actual + " | " + passedDisplay + " |\n"
+  
+  # Add summary
+  output += "\n---\n\n"
+  output += "**Summary:** " + passCount + " passed ✅"
+  
+  if failCount > 0:
+    output += " | " + failCount + " failed ❌"
+  
+  output += "\n"
+  
+  return output
+
 function executeTestsDirectly(functionName):
   # CRITICAL: Verify active connection to Power BI model
   if not hasActiveModelConnection():
@@ -845,8 +981,8 @@ function executeTestsDirectly(functionName):
   try:
     # Try to query function metadata to see if it's loaded
     query := "EVALUATE TOPN(1, INFO.USERDEFINEDFUNCTIONS())"
-    result := call_tool("dax_operations", {
-      operation: "execute_query",
+    result := call_tool("mcp_powerbi-model_dax_query_operations", {
+      operation: "Execute",
       query: query
     })
   catch:
@@ -863,16 +999,8 @@ function executeTestsDirectly(functionName):
     After reopening, the functions will be available for execution.
     """
   
-  # DO NOT PROMPT - Execute immediately after connection verified
-  query := "EVALUATE " + functionName + "()"
-  
-  # Use dax_operations tool from powerbi-modeling-mcp
-  result := call_tool("dax_operations", {
-    operation: "execute_query",
-    query: query
-  })
-  
-  return formatTestResults(result)
+  # Execute test and retrieve results automatically
+  return executeAndRetrieveTests(functionName)
 
 function runAllTests(environment):
   # CRITICAL: Verify active connection to Power BI model
@@ -894,8 +1022,8 @@ function runAllTests(environment):
   try:
     # Quick check to see if functions are available
     query := "EVALUATE TOPN(1, INFO.USERDEFINEDFUNCTIONS())"
-    result := call_tool("dax_operations", {
-      operation: "execute_query",
+    result := call_tool("mcp_powerbi-model_dax_query_operations", {
+      operation: "Execute",
       query: query
     })
   catch:
@@ -912,37 +1040,15 @@ function runAllTests(environment):
     After reopening, the functions will be available for execution.
     """
   
-  # DO NOT PROMPT - Execute immediately after connection verified
-  if environment is null:
-    discoveryQuery := "EVALUATE RetrieveTestsV2()"
+  # Execute tests with automatic result retrieval
+  # Build test function name based on environment
+  if environment is null or environment == "":
+    # If no environment specified, default to ANY
+    testFunctionName := "Schema.ANY.Tests"
   else:
-    discoveryQuery := "EVALUATE RetrieveTestsByEnvironmentV2(\"" + environment + "\")"
+    testFunctionName := "Schema." + environment + ".Tests"
   
-  # Discover tests
-  tests := call_tool("dax_operations", {
-    operation: "execute_query",
-    query: discoveryQuery
-  })
-  
-  results := []
-  for each test in tests:
-    query := "EVALUATE " + test.FunctionName + "()"
-    
-    if test.RequiresImpersonation:
-      result := call_tool("dax_operations", {
-        operation: "execute_query",
-        query: query,
-        impersonate: test.UserName
-      })
-    else:
-      result := call_tool("dax_operations", {
-        operation: "execute_query",
-        query: query
-      })
-    
-    results.append(result)
-  
-  return aggregateResults(results)
+  return executeAndRetrieveTests(testFunctionName)
 
 function upsertFunctionToTmdl(code):
   tmdlPath := locate("definition/functions.tmdl")
@@ -982,9 +1088,8 @@ function '{functionName}' =
 """
   
   # Generate simple query call (for .dax file)
-  # Always quote for consistency (required for names with dots)
-  quotedName := "'" + functionName + "'"
-  queryCall := "EVALUATE " + quotedName + "()"
+  # Call function directly without quotes
+  queryCall := "EVALUATE " + functionName + "()"
   
   return {
     functionName: functionName,
@@ -1134,7 +1239,7 @@ when userRequest matches:
 
 ### Error: "The syntax for '(' is incorrect"
 
-**Cause 1:** .dax file contains DEFINE FUNCTION (function already defined in functions.tmdl)
+**Cause:** .dax file contains DEFINE FUNCTION (function already defined in functions.tmdl)
 
 ❌ **Wrong:**
 ```dax
@@ -1144,19 +1249,7 @@ EVALUATE Schema.ANY.Tests()
 
 ✅ **Fix:** Use only EVALUATE statement
 ```dax
-EVALUATE 'Schema.ANY.Tests'()
-```
-
-**Cause 2:** Missing quotes on function name with dots
-
-❌ **Wrong:**
-```dax
 EVALUATE Schema.ANY.Tests()
-```
-
-✅ **Fix:** Add single quotes
-```dax
-EVALUATE 'Schema.ANY.Tests'()
 ```
 
 ### Error: "Function not found"
