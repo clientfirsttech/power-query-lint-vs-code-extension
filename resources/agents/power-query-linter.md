@@ -431,7 +431,8 @@ tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp
       30. guard: if rule.AIFixInstructions.IsActive == false OR rule.AIFixInstructions.Prompt == "":
            report: "No active fix available for rule '{ruleId}'. Skipping."
            return
-      31. retrieve: AIFixInstructions.Prompt and the matching LintResult.ErrorInformation
+      31. retrieve: AIFixInstructions and ErrorInformation from the matching entry in State.lintResults (already populated during linting — do NOT call get_lint_rules)
+           - if AIFixInstructions is missing from State.lintResults: fall back to calling get_lint_rules to fetch it
       32. apply: the fix instructions (SudoLang program) against State.codeInput
          - pass ErrorInformation.errorLocation.positionStart.lineNumber as the targeted line for non-whole-query fixes
          - if AIFixInstructions.IsWholeQueryFix == true: rewrite entire query
