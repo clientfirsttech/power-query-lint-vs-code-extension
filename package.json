@@ -2,7 +2,7 @@
   "name": "power-query-lint",
   "displayName": "Power Query Lint",
   "description": "Visual Studio Code Extension for Power Query Lint with MCP server support",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "publisher": "ClientFirstTechnologies",
   "icon": "images/icon.jpg",
   "engines": {
@@ -32,7 +32,7 @@
         "path": "resources/agents/power-query-linter.md"
       },
       {
-        "path": "resources/agents/power-query-tester.md"
+        "path": "resources/agents/power-query-tester.sudo.md"
       }
     ],
     "chatSkills": [

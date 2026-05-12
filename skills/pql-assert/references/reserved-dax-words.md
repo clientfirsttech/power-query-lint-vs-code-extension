@@ -198,6 +198,7 @@ The following words are reserved in DAX and must not be used as function names i
 | min |
 | mina |
 | minx |
+| model |
 | move |
 | mparameter |
 | mtd |
