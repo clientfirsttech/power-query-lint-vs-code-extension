@@ -1,0 +1,44 @@
+# Multi-turn dialogue: DAX Query Guidelines – progressive query building
+# Tests building a complete DAX query step by step
+- config:
+    - vars:
+        agent: dax-query-guidelines
+  tests:
+    - description: "DAX guidelines dialogue T1: Ask about DEFINE block structure"
+      vars:
+        prompt: "How should I structure a DEFINE block in a DAX query? What can I define in it?"
+      assert:
+        - type: icontains
+          value: DEFINE
+        - type: javascript
+          value: "output.split(' ').length > 20"
+
+    - description: "DAX guidelines dialogue T2: Ask about SUMMARIZECOLUMNS usage"
+      vars:
+        prompt: "Now show me how to use SUMMARIZECOLUMNS inside an EVALUATE statement to create a summary table."
+      assert:
+        - type: icontains
+          value: SUMMARIZECOLUMNS
+        - type: icontains
+          value: EVALUATE
+        - type: llm-rubric
+          value: >-
+            The response shows how to use SUMMARIZECOLUMNS within an EVALUATE
+            statement, building on the DEFINE block structure explained in
+            Turn 1 to form a more complete query.
+
+    - description: "DAX guidelines dialogue T3: Combine into complete query"
+      vars:
+        prompt: "Put it all together — write a complete DAX query that uses DEFINE to create a measure and EVALUATE with SUMMARIZECOLUMNS to display results."
+      assert:
+        - type: icontains
+          value: DEFINE
+        - type: icontains
+          value: EVALUATE
+        - type: icontains
+          value: SUMMARIZECOLUMNS
+        - type: llm-rubric
+          value: >-
+            The response combines the DEFINE and EVALUATE/SUMMARIZECOLUMNS
+            patterns from the prior two turns into a single complete, valid
+            DAX query.

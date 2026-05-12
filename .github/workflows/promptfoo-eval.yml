@@ -1,0 +1,72 @@
+name: Promptfoo Agent Evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: 'Disable cache for fresh evaluation'
+        type: boolean
+        default: true
+  schedule:
+    - cron: '0 6 * * MON' # Weekly on Monday at 6 AM UTC
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate promptfoo config
+        working-directory: tests/promptfoo
+        run: npx promptfoo@latest validate
+
+      - name: Run promptfoo evaluation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: tests/promptfoo
+        run: |
+          CACHE_FLAG=""
+          if [ "${{ inputs.no_cache }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            CACHE_FLAG="--no-cache"
+          fi
+          npx promptfoo@latest eval $CACHE_FLAG -o results.json
+
+      - name: Print results summary
+        if: always()
+        working-directory: tests/promptfoo
+        run: |
+          if [ -f results.json ]; then
+            echo "## Promptfoo Evaluation Results" >> "$GITHUB_STEP_SUMMARY"
+            node -e "
+              const r = require('./results.json');
+              const stats = r.results?.stats || {};
+              const pass = stats.successes ?? 0;
+              const fail = stats.failures ?? 0;
+              const lines = [
+                '| Metric | Count |',
+                '| ------ | ----- |',
+                '| Total  | ' + (pass + fail) + ' |',
+                '| Pass   | ' + pass + ' |',
+                '| Fail   | ' + fail + ' |',
+              ];
+              console.log(lines.join('\n'));
+            " >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptfoo-results
+          path: tests/promptfoo/results.json
+          retention-days: 30

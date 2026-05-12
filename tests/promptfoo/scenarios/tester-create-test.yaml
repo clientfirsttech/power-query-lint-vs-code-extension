@@ -1,0 +1,42 @@
+# Multi-turn dialogue: Power Query Tester – create test workflow
+# Tests the full cycle: check environment → create test → verify registration
+- config:
+    - vars:
+        agent: power-query-tester
+  tests:
+    - description: "Tester dialogue T1: Ask about test environment requirements"
+      vars:
+        prompt: "What do I need to have set up before I can create a PQL.Assert test for a semantic model?"
+      assert:
+        - type: icontains
+          value: environment
+        - type: icontains
+          value: Assert
+
+    - description: "Tester dialogue T2: Request a new test file"
+      vars:
+        prompt: >-
+          Create a test that verifies a measure called 'Total Sales' returns a
+          value greater than zero. Use PQL.Assert ShouldBeTrue.
+      assert:
+        - type: icontains
+          value: .dax
+        - type: icontains
+          value: ShouldBeTrue
+        - type: llm-rubric
+          value: >-
+            The response creates a DAX test file that uses PQL.Assert
+            ShouldBeTrue to verify a 'Total Sales' measure, consistent with
+            the environment requirements discussed in the previous turn.
+
+    - description: "Tester dialogue T3: Ask how to register the test"
+      vars:
+        prompt: "How do I register this new test in my semantic model project so it runs automatically?"
+      assert:
+        - type: icontains
+          value: daxQueries.json
+        - type: llm-rubric
+          value: >-
+            The response explains how to register the test file created in
+            Turn 2 into daxQueries.json, providing a concrete example that
+            references the test name from the previous turn.

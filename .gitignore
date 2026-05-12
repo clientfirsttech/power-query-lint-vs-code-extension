@@ -5,3 +5,8 @@ out
 .vscode-test/
 .DS_Store
 *.log
+
+# Promptfoo
+tests/promptfoo/results.json
+tests/promptfoo/output/
+.promptfoo/

@@ -1,0 +1,40 @@
+# Multi-turn dialogue: PQL.Assert skill – function exploration
+# Tests exploring assertion functions then asking for concrete usage
+- config:
+    - vars:
+        agent: pql-assert
+  tests:
+    - description: "PQL.Assert dialogue T1: List available assertion functions"
+      vars:
+        prompt: "What assertion functions are available in the PQL.Assert library? Give me a summary."
+      assert:
+        - type: icontains
+          value: Should
+        - type: javascript
+          value: "output.split(' ').length > 20"
+
+    - description: "PQL.Assert dialogue T2: Deep dive into a specific function"
+      vars:
+        prompt: "Tell me more about ShouldBeTrue. What parameters does it accept and what does it return?"
+      assert:
+        - type: icontains
+          value: ShouldBeTrue
+        - type: llm-rubric
+          value: >-
+            The response provides detailed information about the ShouldBeTrue
+            function including its parameters and return value, building on
+            the function list provided in Turn 1.
+
+    - description: "PQL.Assert dialogue T3: Ask for a concrete usage example"
+      vars:
+        prompt: "Show me a complete example of using ShouldBeTrue in a DAX test query with DEFINE and EVALUATE blocks."
+      assert:
+        - type: icontains
+          value: DEFINE
+        - type: icontains
+          value: EVALUATE
+        - type: llm-rubric
+          value: >-
+            The response provides a complete DAX test query example that uses
+            DEFINE and EVALUATE blocks with ShouldBeTrue, consistent with the
+            function details discussed in Turn 2.
