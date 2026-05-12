@@ -140,8 +140,10 @@ EVALUATE PQL.Assert.ShouldEqual("Test 1: 2+2 should equal 4", 4, 2+2)
 
 ### Test Discovery
 
-- `PQL.Assert.RetrieveTests()` - Returns all test functions (ending with .Test or .Tests)
-- `PQL.Assert.RetrieveTestsByEnvironment(environment)` - Returns tests filtered by environment (e.g., "DEV", "TEST", "PROD") matching `.{ENV}.` or `.ANY.` in function names. Case-insensitive. Returns all tests if environment is blank.
+- `PQL.Assert.RetrieveTestsV2()` - Returns all test functions with full metadata columns (`[Name]`, `[Description]`, `[PQLAssert_ImpersonatedUserName]`). Uses `INFO.USERDEFINEDFUNCTIONS` and `INFO.ANNOTATIONS`. **Not compatible with Power Automate.**
+- `PQL.Assert.RetrieveTestsByEnvironmentV2(environment)` - Returns tests filtered by environment (e.g., "DEV", "TEST", "PROD") matching `.{ENV}.` or `.ANY.` in function names with full metadata. Case-insensitive. Returns all tests if environment is blank. **Not compatible with Power Automate.**
+
+> ⚠️ **Power Automate compatibility:** These functions use `INFO.USERDEFINEDFUNCTIONS` and `INFO.ANNOTATIONS`, which are **not supported** in the Power Automate **Execute Dataset Query** action. Use a Power Automate–compatible alternative when calling from Power Automate.
 
 ### Best Practice Validations
 
@@ -337,31 +339,34 @@ EVALUATE Measures.DEV.Tests()
 Use the test discovery functions to find all available test functions:
 
 ```dax
-// Find all test functions
-EVALUATE PQL.Assert.RetrieveTests()
+// Find all test functions with full metadata ([Name], [Description], [PQLAssert_ImpersonatedUserName])
+EVALUATE PQL.Assert.RetrieveTestsV2()
 
 // Find tests by environment (recommended approach)
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("DEV")   // Returns .DEV. and .ANY. tests
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("TEST")  // Returns .TEST. and .ANY. tests
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("PROD")  // Returns .PROD. and .ANY. tests
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("DEV")   // Returns .DEV. and .ANY. tests with metadata
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("TEST")  // Returns .TEST. and .ANY. tests with metadata
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("PROD")  // Returns .PROD. and .ANY. tests with metadata
 
 // Case-insensitive - these are equivalent
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("dev")
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("Dev")
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("DEV")
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("dev")
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("Dev")
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("DEV")
 
 // Custom environments are supported
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("UAT")      // Returns .UAT. and .ANY. tests
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("STAGING")  // Returns .STAGING. and .ANY. tests
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("UAT")      // Returns .UAT. and .ANY. tests
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("STAGING")  // Returns .STAGING. and .ANY. tests
 
-// Blank returns all tests (same as RetrieveTests)
-EVALUATE PQL.Assert.RetrieveTestsByEnvironment("")
-
-// Manual filtering (alternative approach)
-EVALUATE FILTER(PQL.Assert.RetrieveTests(), CONTAINSSTRING([FUNCTION_NAME], ".DEV."))
-EVALUATE FILTER(PQL.Assert.RetrieveTests(), CONTAINSSTRING([FUNCTION_NAME], ".PROD."))
-EVALUATE FILTER(PQL.Assert.RetrieveTests(), CONTAINSSTRING([FUNCTION_NAME], ".ANY."))
+// Blank returns all tests (same as RetrieveTestsV2)
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("")
 ```
+
+#### RLS Test Execution with Impersonation
+
+When `[PQLAssert_ImpersonatedUserName]` is non-blank in the discovery results, the test must be executed with user impersonation so RLS filters are evaluated as the specified user. In the MCP context, use `dax_query_operations` with `EffectiveUserName` set to the value of `[PQLAssert_ImpersonatedUserName]`:
+
+1. Discover tests: `EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("<environment>")`
+2. For each test where `[PQLAssert_ImpersonatedUserName]` is non-blank, execute `EVALUATE <Name>()` via `dax_query_operations` with `EffectiveUserName` = `[PQLAssert_ImpersonatedUserName]`
+3. For all other tests, execute `EVALUATE <Name>()` normally
 
 ### Running All Tests
 
@@ -485,8 +490,8 @@ EVALUATE DataQuality.ANY.Tests()
 EVALUATE BusinessLogic.DEV.Tests()
 
 // Discover all available test functions
-EVALUATE PQL.Assert.RetrieveTests()
+EVALUATE PQL.Assert.RetrieveTestsV2()
 
-// Discover tests by environment
-EVALUATE FILTER(PQL.Assert.RetrieveTests(), CONTAINSSTRING([FUNCTION_NAME], ".DEV."))
+// Discover tests by environment with metadata (includes [PQLAssert_ImpersonatedUserName] for RLS)
+EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("DEV")
 ```

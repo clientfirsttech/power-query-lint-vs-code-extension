@@ -32,7 +32,7 @@
         "path": "resources/agents/power-query-linter.md"
       },
       {
-        "path": "resources/agents/power-query-tester.md"
+        "path": "resources/agents/power-query-tester.sudo.md"
       }
     ],
     "chatSkills": [
