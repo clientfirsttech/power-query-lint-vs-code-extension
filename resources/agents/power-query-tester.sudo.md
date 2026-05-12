@@ -125,6 +125,111 @@ When creating tests, you MUST:
 
 ---
 
+## DAX Query File Rules (CRITICAL)
+
+**Functions are defined ONCE in functions.tmdl. Query files ONLY call them.**
+
+### Correct File Structure
+
+**functions.tmdl** (function definition):
+```dax
+function 'Schema.ANY.Tests' =
+    () =>
+        UNION(
+            PQL.Assert.Tbl.ShouldExist("MarvelFact table exists", "MarvelFact"),
+            PQL.Assert.Tbl.ShouldExist("DateDim table exists", "DateDim")
+        )
+```
+
+**Schema.ANY.Tests.dax** (function call only):
+```dax
+EVALUATE 'Schema.ANY.Tests'()
+```
+
+### Common Mistakes to Avoid
+
+❌ **WRONG** - Redefining function in .dax file:
+```dax
+DEFINE FUNCTION Schema.ANY.Tests() = UNION(...)
+EVALUATE Schema.ANY.Tests()
+```
+**Error:** `The syntax for '(' is incorrect`
+
+❌ **WRONG** - Missing quotes on dotted names:
+```dax
+EVALUATE Schema.ANY.Tests()
+```
+**Error:** `The syntax for '(' is incorrect`
+
+✅ **CORRECT** - Simple function call with quotes:
+```dax
+EVALUATE 'Schema.ANY.Tests'()
+```
+
+### Quoting Rules
+- Function names with dots → **must** use single quotes: `'Schema.ANY.Tests'()`
+- Simple names (no dots) → quotes optional: `MyTest()` or `'MyTest'()`
+- **Best practice:** Always quote for consistency
+
+### Why This Matters
+TMDL-based models (compatibility level ≥ 1702) define functions once in `functions.tmdl`. The `.dax` query files should **ONLY call** these functions, not redefine them. Redefining causes syntax errors because the function already exists.
+
+### Complete Example: End-to-End Flow
+
+**User Request:** "Create tests for schema validation, environment ANY"
+
+**Step 1: Generate Code**
+```sudo
+code := generateTestCode("schema", ["MarvelFact", "DateDim"], "ANY")
+# Returns:
+# {
+#   functionName: "Schema.ANY.Tests",
+#   definition: "function 'Schema.ANY.Tests' = () => UNION(...)",
+#   queryCall: "EVALUATE 'Schema.ANY.Tests'()",
+#   environment: "ANY"
+# }
+```
+
+**Step 2: Create functions.tmdl Entry**
+```dax
+function 'Schema.ANY.Tests' =
+    () =>
+        UNION(
+            PQL.Assert.Tbl.ShouldExist("MarvelFact table exists", "MarvelFact"),
+            PQL.Assert.Tbl.ShouldExist("DateDim table exists", "DateDim")
+        )
+    lineageTag: 8f3a5b2e-9d4c-4e1a-8b5f-3c2d1e4a6b7c
+    
+    annotation PQLAssert_Environment = ANY
+    annotation PQLAssert_Category = Schema
+```
+
+**Step 3: Create Schema.ANY.Tests.dax File**
+```dax
+EVALUATE 'Schema.ANY.Tests'()
+```
+
+**Step 4: Update daxQueries.json**
+```json
+{
+  "version": "1.0.0",
+  "tabOrder": ["Schema.ANY.Tests"],
+  "defaultTab": "Schema.ANY.Tests"
+}
+```
+
+**Step 5: User Action**
+1. Save changes (Ctrl+S)
+2. Close file in Power BI Desktop
+3. Reopen .pbip file
+4. Open DAX Query View
+5. Click "Schema.ANY.Tests" tab
+6. Click Run ▶️
+
+**Result:** ✅ 2 rows with TestName, Expected, Actual, Passed columns
+
+---
+
 ## Constraints (STRICT)
 
 - MUST ask environment before creating tests
@@ -141,11 +246,12 @@ When creating tests, you MUST:
 - **MUST identify and convert legacy DAX Query Testing patterns to PQL.Assert**
 - **MUST instruct user to close/reopen .pbip file after function changes**
 - **MUST verify connection before executing any DAX queries**
+- **MUST create .dax files with ONLY EVALUATE statement (no DEFINE FUNCTION)**
+- **MUST quote function names with dots in .dax files** (e.g., 'Schema.ANY.Tests')
 - MUST NOT modify production measures or schema
 - MUST return complete DAX queries
-- MUST use `DEFINE FUNCTION`
+- MUST use `DEFINE FUNCTION` in functions.tmdl only
 - MUST combine multiple assertions with `UNION`
-- MUST NOT quote function names in `.dax`
 - Naming format: `[Area].[Environment].Test(s)` (no reserved words)
 - Avoid visuals and Power Query (M)
 
@@ -158,6 +264,13 @@ interface TestResult {
   Expected: any
   Actual: any
   Passed: boolean
+}
+
+interface TestCode {
+  functionName: string        # e.g., "Schema.ANY.Tests"
+  definition: string          # TMDL function definition (for functions.tmdl)
+  queryCall: string          # Simple EVALUATE statement (for .dax file)
+  environment: string        # DEV | TEST | PROD | ANY
 }
 
 interface DaxQueriesConfig {
@@ -181,6 +294,21 @@ TEST_CATEGORIES_BY_ENV = {
 NAMING_FORMAT = "[Area].[Environment].Test(s)"
 
 RESERVED_DAX_WORDS_FILE = "skills/pql-assert/references/reserved-dax-words.md"
+
+# Common DAX reserved words to check (full list in reserved-dax-words.md)
+COMMON_RESERVED_WORDS = [
+  "Content", "Model", "Table", "Date", "Filter", "Calculate",
+  "Column", "Measure", "Row", "Value", "Data", "Function"
+]
+
+RESERVED_WORD_REPLACEMENTS = {
+  "Content": "DataContent",
+  "Model": "DataModel",
+  "Table": "TableData",
+  "Date": "DateData",
+  "Filter": "FilterData",
+  "Calculate": "CalculationData"
+}
 
 ---
 
@@ -387,10 +515,11 @@ function createTest(userRequest):
   testType := identifyTestType(userRequest)
   targets := identifyTargets(testType, userRequest)
   
+  # Generate test code (includes reserved word validation)
   code := generateTestCode(testType, targets, env)
   
-  # CRITICAL: Validate function name against reserved words
-  validateFunctionName(code.functionName)
+  # Code generation already validated function name
+  # No need to validate again here
   
   upsertFunctionToTmdl(code)
   createDaxFile(code)
@@ -823,14 +952,58 @@ function upsertFunctionToTmdl(code):
   else:
     appendFunction(tmdlPath, code.definition)
 
+function generateTestCode(testType, targets, env):
+  # Generate function name - avoid reserved words
+  area := determineArea(testType)
+  
+  # Check if area name is a reserved word and fix it
+  if area in COMMON_RESERVED_WORDS:
+    if area in RESERVED_WORD_REPLACEMENTS:
+      area := RESERVED_WORD_REPLACEMENTS[area]
+    else:
+      area := "Data" + area
+  
+  functionName := area + "." + env + ".Tests"
+  
+  # Validate against full reserved words list
+  validateFunctionName(functionName)
+  
+  # Build assertion calls
+  assertions := buildAssertions(testType, targets)
+  
+  # Generate TMDL function definition (for functions.tmdl)
+  definition := """
+/// {testType} tests for {environment} environment
+function '{functionName}' =
+    () =>
+        UNION(
+            {assertions}
+        )
+"""
+  
+  # Generate simple query call (for .dax file)
+  # Always quote for consistency (required for names with dots)
+  quotedName := "'" + functionName + "'"
+  queryCall := "EVALUATE " + quotedName + "()"
+  
+  return {
+    functionName: functionName,
+    definition: definition,
+    queryCall: queryCall,
+    environment: env
+  }
+
 function createDaxFile(code):
   modelFolder := locate("*.SemanticModel")
   daxPath := modelFolder + "/DAXQueries/" + code.functionName + ".dax"
   
-  # Ensure root DAXQueries only
+  # Ensure root DAXQueries only (no subfolders)
   assert not contains(daxPath, "/DAXQueries/*/")
   
-  write_file(daxPath, code.query)
+  # CRITICAL: .dax file contains ONLY the EVALUATE statement
+  # Function is already defined in functions.tmdl
+  # DO NOT include DEFINE FUNCTION here
+  write_file(daxPath, code.queryCall)
 
 function updateDaxQueriesJson(functionName):
   jsonPath := locate("DAXQueries/.pbi/daxQueries.json")
@@ -954,6 +1127,77 @@ when userRequest matches:
     else:
       respondWithCapabilities()
 ```
+
+---
+
+## Troubleshooting Common Errors
+
+### Error: "The syntax for '(' is incorrect"
+
+**Cause 1:** .dax file contains DEFINE FUNCTION (function already defined in functions.tmdl)
+
+❌ **Wrong:**
+```dax
+DEFINE FUNCTION Schema.ANY.Tests() = UNION(...)
+EVALUATE Schema.ANY.Tests()
+```
+
+✅ **Fix:** Use only EVALUATE statement
+```dax
+EVALUATE 'Schema.ANY.Tests'()
+```
+
+**Cause 2:** Missing quotes on function name with dots
+
+❌ **Wrong:**
+```dax
+EVALUATE Schema.ANY.Tests()
+```
+
+✅ **Fix:** Add single quotes
+```dax
+EVALUATE 'Schema.ANY.Tests'()
+```
+
+### Error: "Function not found"
+
+**Cause:** TMDL function definitions not loaded in running model
+
+**Fix:**
+1. Close Power BI Desktop file (Ctrl+S first)
+2. Reopen the .pbip file
+3. Power BI reloads all TMDL including functions
+4. Open DAX Query View and run tests
+
+### Error: Reserved word violation
+
+**Cause:** Function name contains DAX reserved word (Model, Table, Content, Date, Filter, etc.)
+
+❌ **Wrong:**
+```dax
+function 'Content.ANY.Tests' = ...
+```
+
+✅ **Fix:** Use alternative naming
+```dax
+function 'DataContent.ANY.Tests' = ...
+```
+
+**Common replacements:**
+- Content → DataContent
+- Model → DataModel
+- Table → TableData
+- Date → DateData
+
+### Error: "Compatibility level too low"
+
+**Cause:** Model compatibility level < 1702 (function definitions not supported)
+
+**Fix:**
+1. Open model in Power BI Desktop
+2. Go to Model properties
+3. Change Compatibility Level to 1702 or higher
+4. Save and close/reopen the .pbip file
 
 ---
 
