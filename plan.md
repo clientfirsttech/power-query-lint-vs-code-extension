@@ -83,3 +83,76 @@ Updated with accurate PyPI documentation including:
 - Changes to `.github/skills/pql-test/SKILL.md` (development workflow)
 - Changes to `scripts/invoke_pql_test.py` (CI/CD internal)
 - Bundling the `pql-test` Python package in the extension
+
+---
+
+## PQL.Assert 0.5.0 Skill Update
+
+**Goal**: Update the deployed `pql-assert` skill to the PQL.Assert DAX Library 0.5.0 release so users can discover and use the new assertion functions.
+
+### Background
+
+The local `skills/pql-assert/references/functions.tmdl` currently ships PQL.Assert **0.3.0**. PQL.Assert **0.5.0** is available from [DAX Lib](https://daxlib.org/package/PQL.Assert/) and adds new assertion categories:
+
+- **Perspective Assertions**
+  - `PQL.Assert.Perspective.ShouldExist(testName, perspectiveName)`
+  - `PQL.Assert.Perspective.ShouldContain(testName, perspectiveName, expectedTablesList, expectedColumnsList, expectedMeasuresList)`
+  - `PQL.Assert.Perspective.ShouldMatchSchema(testName, perspectiveName, expectedTablesList, expectedColumnsList, expectedMeasuresList)`
+
+- **Partition Assertions**
+  - `PQL.Assert.Partitions.ShouldExist(testName, tableName, partitionName)`
+  - `PQL.Assert.Partitions.ShouldBe(testName, tableName, expectedPartitionCount)`
+  - `PQL.Assert.Partitions.ShouldBeAtLeast(testName, tableName, minPartitionCount)`
+
+- **Test Discovery Enhancements**
+  - `PQL.Assert.RetrieveTestsV2()` and `PQL.Assert.RetrieveTestsByEnvironmentV2()` now return an additional `[PQLAssert_RoleName]` metadata column alongside `[PQLAssert_ImpersonatedUserName]`.
+
+### Tasks
+
+#### 1. Update `skills/pql-assert/references/functions.tmdl` to 0.5.0
+**Status**: ✅ Complete
+
+Replaced the embedded TMDL definitions with the official PQL.Assert 0.5.0 release from DAX Lib. All 101 functions now carry `DAXLIB_PackageVersion = 0.5.0` annotations.
+
+#### 2. Update `skills/pql-assert/SKILL.md`
+**Status**: ✅ Complete
+
+Added documentation for:
+- Perspective assertion functions (`PQL.Assert.Perspective.ShouldExist`, `ShouldContain`, `ShouldMatchSchema`)
+- Partition assertion functions (`PQL.Assert.Partitions.ShouldExist`, `ShouldBe`, `ShouldBeAtLeast`)
+- Updated V2 test discovery schema to include the `[PQLAssert_RoleName]` column
+- Updated RLS/OLS execution guidance to reference `[PQLAssert_RoleName]`
+
+#### 3. Document OLS Assertions (Existing Doc Gap)
+**Status**: ✅ Complete
+
+Added an Object Level Security (OLS) section documenting the table-level and column-level `PQL.Assert.OLS.*` functions that already existed in the TMDL. Included a TMDL role/permission example and a sample `DEFINE FUNCTION ... UNION(...)` runner.
+
+#### 4. Validate Extension Packaging
+**Status**: ✅ Complete
+
+- `npm run compile` succeeded
+- `skills/pql-assert/` remains registered in `package.json` `chatSkills`
+- No broken skill references detected
+
+### Acceptance Criteria
+
+- [x] `skills/pql-assert/references/functions.tmdl` contains PQL.Assert 0.5.0 definitions
+- [x] `skills/pql-assert/SKILL.md` documents all new 0.5.0 functions
+- [x] `skills/pql-assert/SKILL.md` documents the existing `PQL.Assert.OLS.*` functions
+- [x] `DAXLIB_PackageVersion` annotations read `0.5.0`
+- [x] Extension compiles without errors
+- [x] Skill remains registered in `package.json` `chatSkills`
+
+### Dependencies
+
+| Dependency | Status |
+|------------|--------|
+| PQL.Assert 0.5.0 release | ✅ Available on DAX Lib |
+| Existing pql-assert skill | ✅ Exists |
+
+### Out of Scope
+
+- Implementing assertion logic changes (use official 0.5.0 TMDL verbatim)
+- Changes to `pql-test` skill or agents
+- Automated tests for the skill content

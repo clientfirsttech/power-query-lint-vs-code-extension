@@ -138,12 +138,93 @@ EVALUATE PQL.Assert.ShouldEqual("Test 1: 2+2 should equal 4", 4, 2+2)
 
 - `PQL.Assert.Relationship.ShouldExist(testName, fromTable, fromColumn, toTable, toColumn)` - Asserts relationship exists
 
+### Perspective Assertions
+
+- `PQL.Assert.Perspective.ShouldExist(testName, perspectiveName)` - Asserts that a perspective exists in the model
+- `PQL.Assert.Perspective.ShouldContain(testName, perspectiveName, expectedTablesList, expectedColumnsList, expectedMeasuresList)` - Asserts that a perspective contains the specified tables, columns, and measures (provided as comma-separated lists; pass `""` for object types not being checked)
+- `PQL.Assert.Perspective.ShouldMatchSchema(testName, perspectiveName, expectedTablesList, expectedColumnsList, expectedMeasuresList)` - Asserts that a perspective contains exactly the specified tables, columns, and measures and no additional objects
+
+**Example Usage:**
+```dax
+// Verify perspective exists
+EVALUATE PQL.Assert.Perspective.ShouldExist("Finance perspective exists", "Finance")
+
+// Verify perspective contains expected objects
+EVALUATE PQL.Assert.Perspective.ShouldContain(
+    "Finance perspective should contain core objects",
+    "Finance",
+    "Sales,Customers,Products",     // expected tables
+    "Sales[Amount],Sales[OrderDate]", // expected columns
+    "Sales[Total Sales]"              // expected measures
+)
+
+// Verify perspective schema matches exactly (no extra objects)
+EVALUATE PQL.Assert.Perspective.ShouldMatchSchema(
+    "Finance perspective schema should match",
+    "Finance",
+    "Sales,Customers",
+    "Customers[CustomerName]",
+    "Sales[Total Sales],Sales[YTD Sales]"
+)
+```
+
+### Partition Assertions
+
+- `PQL.Assert.Partitions.ShouldExist(testName, tableName, partitionName)` - Asserts that a named partition exists on the specified table
+- `PQL.Assert.Partitions.ShouldBe(testName, tableName, expectedPartitionCount)` - Asserts that the table has exactly the expected number of partitions
+- `PQL.Assert.Partitions.ShouldBeAtLeast(testName, tableName, minPartitionCount)` - Asserts that the table has at least the specified number of partitions
+
+**Example Usage:**
+```dax
+EVALUATE PQL.Assert.Partitions.ShouldExist("Sales 2024 partition exists", "Sales", "Sales 2024")
+EVALUATE PQL.Assert.Partitions.ShouldBe("Sales has two partitions", "Sales", 2)
+EVALUATE PQL.Assert.Partitions.ShouldBeAtLeast("Sales has at least one partition", "Sales", 1)
+```
+
+### Object Level Security (OLS) Assertions
+
+> **Note:** OLS assertions rely on the current role/security context. Run them with **Modeling → Security → View as** set to the role you want to validate, or via an MCP tool using `EffectiveUserName`/`RoleName`.
+
+- **Table-Level OLS**
+  - `PQL.Assert.OLS.TableShouldBeHidden(testName, tableName)` - Asserts that the table is hidden from metadata (OLS `metadataPermission: none`) in the current context
+  - `PQL.Assert.OLS.TableShouldBeVisible(testName, tableName)` - Asserts that the table is visible in metadata in the current context
+
+- **Column-Level OLS**
+  - `PQL.Assert.OLS.ColumnShouldBeHidden(testName, tableName, columnName)` - Asserts that the column is hidden from metadata (OLS `columnPermission: none`) in the current context
+  - `PQL.Assert.OLS.ColumnShouldBeVisible(testName, tableName, columnName)` - Asserts that the column is visible in metadata in the current context
+
+**Example TMDL role configuration:**
+```tmdl
+role West
+    modelPermission: read
+
+    tablePermission 'Admin Table' = none
+
+    tablePermission 'Hidden Column Table' = read
+        columnPermission 'Hidden Column' = none
+```
+
+**Example OLS test runner:**
+```dax
+DEFINE
+    FUNCTION OLS_West.ANY.Tests = () =>
+    UNION(
+        PQL.Assert.OLS.TableShouldBeHidden("West: Admin Table should be hidden", "Admin Table"),
+        PQL.Assert.OLS.ColumnShouldBeHidden("West: Hidden Column should be hidden", "Hidden Column Table", "Hidden Column"),
+        PQL.Assert.OLS.TableShouldBeVisible("West: Groups table should be visible", "Groups")
+    )
+
+EVALUATE OLS_West.ANY.Tests()
+```
+
 ### Test Discovery
 
-- `PQL.Assert.RetrieveTestsV2()` - Returns all test functions with full metadata columns (`[Name]`, `[Description]`, `[PQLAssert_ImpersonatedUserName]`). Uses `INFO.USERDEFINEDFUNCTIONS` and `INFO.ANNOTATIONS`. **Not compatible with Power Automate.**
+- `PQL.Assert.RetrieveTestsV2()` - Returns all test functions with full metadata columns (`[Name]`, `[Description]`, `[PQLAssert_ImpersonatedUserName]`, `[PQLAssert_RoleName]`). Uses `INFO.USERDEFINEDFUNCTIONS` and `INFO.ANNOTATIONS`. **Not compatible with Power Automate.**
 - `PQL.Assert.RetrieveTestsByEnvironmentV2(environment)` - Returns tests filtered by environment (e.g., "DEV", "TEST", "PROD") matching `.{ENV}.` or `.ANY.` in function names with full metadata. Case-insensitive. Returns all tests if environment is blank. **Not compatible with Power Automate.**
 
 > ⚠️ **Power Automate compatibility:** These functions use `INFO.USERDEFINEDFUNCTIONS` and `INFO.ANNOTATIONS`, which are **not supported** in the Power Automate **Execute Dataset Query** action. Use a Power Automate–compatible alternative when calling from Power Automate.
+
+> **Note:** V2 discovery results include a `[PQLAssert_RoleName]` column. If this value is non-blank, execute the test under that role context so OLS/RLS rules are evaluated correctly.
 
 ### Best Practice Validations
 
@@ -339,7 +420,7 @@ EVALUATE Measures.DEV.Tests()
 Use the test discovery functions to find all available test functions:
 
 ```dax
-// Find all test functions with full metadata ([Name], [Description], [PQLAssert_ImpersonatedUserName])
+// Find all test functions with full metadata ([Name], [Description], [PQLAssert_ImpersonatedUserName], [PQLAssert_RoleName])
 EVALUATE PQL.Assert.RetrieveTestsV2()
 
 // Find tests by environment (recommended approach)
@@ -362,11 +443,12 @@ EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("")
 
 #### RLS Test Execution with Impersonation
 
-When `[PQLAssert_ImpersonatedUserName]` is non-blank in the discovery results, the test must be executed with user impersonation so RLS filters are evaluated as the specified user. In the MCP context, use `dax_query_operations` with `EffectiveUserName` set to the value of `[PQLAssert_ImpersonatedUserName]`:
+When `[PQLAssert_ImpersonatedUserName]` is non-blank in the discovery results, the test must be executed with user impersonation so RLS filters are evaluated as the specified user. When `[PQLAssert_RoleName]` is non-blank, execute the test under that role so OLS/RLS rules are applied. In the MCP context, use `dax_query_operations` with `EffectiveUserName` set to the value of `[PQLAssert_ImpersonatedUserName]` and/or `RoleName` set to `[PQLAssert_RoleName]` according to the tool's capabilities.
 
 1. Discover tests: `EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("<environment>")`
-2. For each test where `[PQLAssert_ImpersonatedUserName]` is non-blank, execute `EVALUATE <Name>()` via `dax_query_operations` with `EffectiveUserName` = `[PQLAssert_ImpersonatedUserName]`
-3. For all other tests, execute `EVALUATE <Name>()` normally
+2. For each test where `[PQLAssert_ImpersonatedUserName]` is non-blank, execute `EVALUATE <Name>()` with `EffectiveUserName` = `[PQLAssert_ImpersonatedUserName]`
+3. For each test where `[PQLAssert_RoleName]` is non-blank, execute `EVALUATE <Name>()` with `RoleName` = `[PQLAssert_RoleName]`
+4. For all other tests, execute `EVALUATE <Name>()` normally
 
 ### Running All Tests
 
@@ -492,6 +574,6 @@ EVALUATE BusinessLogic.DEV.Tests()
 // Discover all available test functions
 EVALUATE PQL.Assert.RetrieveTestsV2()
 
-// Discover tests by environment with metadata (includes [PQLAssert_ImpersonatedUserName] for RLS)
+// Discover tests by environment with metadata (includes [PQLAssert_ImpersonatedUserName] and [PQLAssert_RoleName] for RLS/OLS)
 EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("DEV")
 ```

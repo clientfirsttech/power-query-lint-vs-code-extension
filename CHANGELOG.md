@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.0.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.9.0...v1.0.0) (2026-08-14)
+
+### Features
+
+* update pql-assert skill to PQL.Assert DAX Library 0.5.0 from DAX Lib
+* add Perspective assertions: `PQL.Assert.Perspective.ShouldExist`, `ShouldContain`, `ShouldMatchSchema`
+* add Partition assertions: `PQL.Assert.Partitions.ShouldExist`, `ShouldBe`, `ShouldBeAtLeast`
+* document Object Level Security (OLS) assertions: `PQL.Assert.OLS.TableShouldBeHidden`, `TableShouldBeVisible`, `ColumnShouldBeHidden`, `ColumnShouldBeVisible`
+* update V2 test discovery documentation to include `[PQLAssert_RoleName]` metadata and OLS/RLS execution guidance
+
 ## [0.9.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.8.0...v0.9.0) (2026-05-13)
 
 ### [0.7.1](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.7.0...v0.7.1) (2026-03-12)
