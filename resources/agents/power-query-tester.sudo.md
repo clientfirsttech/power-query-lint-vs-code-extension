@@ -1,7 +1,7 @@
 ---
 name: PQL - Tester
 description: Semantic model testing specialist for Power BI using DAX Query View and PQL.Assert without modifying production logic
-tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*']
+tools: ['read', 'agent', 'edit', 'search', 'execute', 'powerbi-modeling-mcp/*']
 skills: ['pql-assert', 'pql-test']
 ---
 
@@ -510,9 +510,12 @@ function extractLogFormat(userRequest):
 
 function run_command(command):
   # Execute a shell command and return { exitCode, stdout, stderr }
-  # Tool availability depends on the agent runtime
-  result := call_tool("shell", { command: command })
-  return result
+  # VS Code agent runtime exposes the shell execution tool as "execute"
+  try:
+    result := call_tool("execute", { command: command })
+    return result
+  catch:
+    return { exitCode: 127, stdout: "", stderr: "execute tool is not available" }
 ```
 
 ## Best Practice Assertions
@@ -834,15 +837,27 @@ function generateAlternatives(reservedWord):
   else:
     return reservedWord + "Data, " + reservedWord + "Content, Data" + capitalizeFirst(reservedWord)
 
+function findPqlTestCommand():
+  # Find a working pql-test invocation.
+  # Returns the command prefix (e.g., "pql-test" or "python -m pql_test") or null.
+  candidates := [
+    "pql-test",
+    "python -m pql_test",
+    "python3 -m pql_test",
+    "py -m pql_test"
+  ]
+  for each candidate in candidates:
+    try:
+      result := run_command(candidate + " --version")
+      if result.exitCode == 0:
+        return candidate
+    catch:
+      continue
+  return null
+
 function isPqlTestAvailable():
-  # Check whether pql-test is installed and on PATH
-  try:
-    result := run_command("pql-test --version")
-    if result.exitCode == 0:
-      return true
-  catch:
-    return false
-  return false
+  # Check whether pql-test is installed and on PATH or via python module
+  return findPqlTestCommand() is not null
 
 function ensurePqlTestInstalled():
   if isPqlTestAvailable():
@@ -1098,16 +1113,16 @@ function resolveModelPath():
     halt "Cannot find a *.SemanticModel folder. Provide a model path or open a PBIP project."
   return modelFolder
 
-function runPqlTestDiscovery(modelPath):
-  cmd := "pql-test retrieve-tests " + modelPath
+function runPqlTestDiscovery(modelPath, commandPrefix):
+  cmd := commandPrefix + " retrieve-tests " + modelPath
   notify("🔍 Discovering tests via pql-test...")
   result := run_command(cmd)
   if result.exitCode != 0:
     halt "pql-test retrieve-tests failed: " + result.stderr
   return result.stdout
 
-function runPqlTestExecution(modelPath, environment, outputFile, logFormat):
-  cmd := "pql-test run-tests " + modelPath
+function runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix):
+  cmd := commandPrefix + " run-tests " + modelPath
   if environment is not null and environment != "":
     cmd += " --env " + environment
   if outputFile is not null and outputFile != "":
@@ -1121,11 +1136,40 @@ function runPqlTestExecution(modelPath, environment, outputFile, logFormat):
     halt "pql-test run-tests failed: " + result.stderr
   return result.stdout
 
-function runAllTests(environment, outputFile, logFormat):
+function pqlTestNotFoundMessage():
+  return """
+  ⚠️ pql-test NOT FOUND
+
+  The `pql-test` CLI is required for bulk test discovery and execution.
+
+  To install:
+  1. Create a virtual environment (recommended):
+     python -m venv .venv
+  2. Activate it:
+     .venv\Scripts\Activate.ps1   (Windows PowerShell)
+     .venv\Scripts\activate.bat   (Windows cmd)
+     source .venv/bin/activate     (macOS/Linux)
+  3. Install pql-test:
+     pip install pql-test
+  4. Verify:
+     pql-test --version
+
+  If `pql-test` is already installed but not on PATH, you can also run:
+     python -m pql_test --version
+
+  For detailed CLI reference, consult the `pql-test` skill.
+  """
+
+function runAllTests(environment, outputFile, logFormat, forceMcp):
+  commandPrefix := findPqlTestCommand()
+
   # Prefer pql-test when available
-  if isPqlTestAvailable():
+  if commandPrefix is not null:
     modelPath := resolveModelPath()
-    return runPqlTestExecution(modelPath, environment, outputFile, logFormat)
+    return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
+
+  if not forceMcp:
+    halt pqlTestNotFoundMessage()
 
   # Fallback: MCP direct execution
   notify("⚠️ pql-test not available. Falling back to direct DAX Query View execution.")
@@ -1177,11 +1221,16 @@ function runAllTests(environment, outputFile, logFormat):
 
   return executeAndRetrieveTests(testFunctionName)
 
-function discoverAllTests():
+function discoverAllTests(forceMcp):
+  commandPrefix := findPqlTestCommand()
+
   # Prefer pql-test when available
-  if isPqlTestAvailable():
+  if commandPrefix is not null:
     modelPath := resolveModelPath()
-    return runPqlTestDiscovery(modelPath)
+    return runPqlTestDiscovery(modelPath, commandPrefix)
+
+  if not forceMcp:
+    halt pqlTestNotFoundMessage()
 
   # Fallback: MCP direct discovery
   notify("⚠️ pql-test not available. Falling back to PQL.Assert.RetrieveTestsByEnvironmentV2() via MCP.")
@@ -1302,14 +1351,16 @@ on command "validate-model-structure":
 
 on command "retrieve-tests":
   # DO NOT PROMPT - Execute immediately
-  discoverAllTests()
+  forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
+  discoverAllTests(forceMcp)
 
 on command "run-all-tests":
   # DO NOT PROMPT - Execute immediately
   env := extractEnvironment(userRequest) or null
   output := extractOutputFile(userRequest) or null
   logFormat := extractLogFormat(userRequest) or null
-  runAllTests(env, output, logFormat)
+  forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
+  runAllTests(env, output, logFormat, forceMcp)
 
 on command "validate-best-practices":
   category := extractCategory(userRequest)
@@ -1332,16 +1383,19 @@ when userRequest matches:
     env := extractEnvironment(userRequest)
     output := extractOutputFile(userRequest) or null
     logFormat := extractLogFormat(userRequest) or null
-    runAllTests(env, output, logFormat)
+    forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
+    runAllTests(env, output, logFormat, forceMcp)
 
   case /execute\s+tests?/i:
     env := extractEnvironment(userRequest)
     output := extractOutputFile(userRequest) or null
     logFormat := extractLogFormat(userRequest) or null
-    runAllTests(env, output, logFormat)
+    forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
+    runAllTests(env, output, logFormat, forceMcp)
 
   case /(find|discover|retrieve|list)\s+tests?/i:
-    discoverAllTests()
+    forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
+    discoverAllTests(forceMcp)
   
   # TEST CREATION (May prompt for clarification)
   case /test\s+(the\s+)?measure/i:

@@ -245,3 +245,77 @@ Added a "Test Execution Mode" section near the top of the agent explaining when 
 - Modifying the `pql-test` skill content
 - Adding new MCP tools
 - Bundling Python/pql-test in the extension
+
+---
+
+## Fix PQL - Tester Agent: Actually Use `pql-test` Instead of Silent MCP Fallback
+
+**Goal**: Fix the `PQL - Tester` agent so it reliably uses `pql-test` for test discovery/execution when available, and surfaces a clear message instead of silently falling back to MCP.
+
+### Background
+
+The agent was updated to prefer `pql-test`, but testing on another machine showed it still used `powerbi-modeling-mcp` DAX query operations. Likely causes:
+
+1. **Missing `execute` tool declaration**: The agent frontmatter declares `tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*']` but `isPqlTestAvailable()` calls `call_tool("execute", ...)`. If `execute` is not declared, the availability check fails and the agent silently falls back to MCP.
+2. **Fragile availability detection**: `pql-test --version` requires the CLI to be on PATH. A user may have it installed in a venv that the agent shell does not inherit.
+3. **Silent fallback**: When `pql-test` is missing, the agent falls back to MCP without telling the user why or how to enable `pql-test`.
+
+### Tasks
+
+#### 1. Add `execute` Tool to Agent Frontmatter
+**Status**: ✅ Done
+
+Update frontmatter so the agent can run shell commands:
+```yaml
+tools: ['read', 'agent', 'edit', 'search', 'execute', 'powerbi-modeling-mcp/*']
+```
+`execute` is the VS Code agent tool alias for running shell/terminal commands.
+
+#### 2. Make `pql-test` Availability Detection Robust
+**Status**: 🔲 Not Started
+
+- Try `pql-test --version` first.
+- Fallback to `python -m pql_test --version` (or equivalent module invocation) in case the CLI entry point is not on PATH.
+- Return the detected command prefix (`"pql-test"` or `"python -m pql_test"`) so execution uses the same path.
+
+#### 3. Surface Clear Fallback Messaging
+**Status**: 🔲 Not Started
+
+When `pql-test` is not detected:
+- Do **not** silently fall back to MCP for bulk discovery/execution.
+- Tell the user `pql-test` was not found and provide concise install instructions.
+- Only fall back to MCP if the user explicitly asks to run in DAX Query View or the request is for a single test function.
+
+#### 4. Update `runAllTests` and `discoverAllTests` to Use Detected Command
+**Status**: 🔲 Not Started
+
+Pass the detected command prefix into `runPqlTestExecution`/`runPqlTestDiscovery` so the actual invocation matches the availability probe.
+
+#### 5. Validate Packaging
+**Status**: 🔲 Not Started
+
+- `npm run compile`
+- `npm run package`
+- Verify agent file is included
+
+### Acceptance Criteria
+
+- [x] Agent frontmatter declares the `execute` tool
+- [ ] `pql-test` availability is detected via CLI and module fallback
+- [ ] Missing `pql-test` produces a clear message with install instructions instead of silent MCP fallback
+- [ ] When `pql-test` is available, discovery/execution requests invoke it
+- [ ] Extension compiles and packages without errors
+- [ ] Changes are committed
+
+### Dependencies
+
+| Dependency | Status |
+|------------|--------|
+| `pql-test` skill | ✅ Exists |
+| Updated PQL - Tester agent | ✅ Exists |
+
+### Out of Scope
+
+- Changing `pql-test` skill content
+- Bundling `pql-test` with the extension
+- Publishing a new version (do after validation)
