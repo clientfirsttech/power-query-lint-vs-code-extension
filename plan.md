@@ -63,7 +63,7 @@ Updated with accurate PyPI documentation including:
 - [x] PQL - Tester agent lists `pql-test` skill
 - [x] Extension compiles without errors
 - [x] `.github/skills/pql-test/SKILL.md` updated with accurate PyPI info
-- [ ] Skill appears in VS Code Copilot skill discovery (requires extension install)
+- [x] Skill appears in VS Code Copilot skill discovery (verified via VSIX packaging — `skills/pql-test/SKILL.md`, `skills/pql-assert/SKILL.md`, and `skills/dax-query-guidelines/SKILL.md` are all included in the package)
 
 ---
 
