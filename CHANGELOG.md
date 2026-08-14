@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.1](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.1.0...v1.1.1) (2026-08-14)
+
+### Bug Fixes
+
+* declare `execute` tool in PQL - Tester agent so shell commands can run
+* detect `pql-test` via CLI and `python -m pql_test` module fallback
+* surface clear install instructions instead of silently falling back to MCP
+
+### Features
+
+* add `forceMcp` routing so users can still request DAX Query View / MCP execution explicitly
+
+> ⚠️ **Pre-release**: This version is published as a VS Code Marketplace pre-release (odd minor version). Users must opt in via the pre-release channel.
+
 ## [1.1.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.0.0...v1.1.0) (2026-08-14)
 
 ### Features
