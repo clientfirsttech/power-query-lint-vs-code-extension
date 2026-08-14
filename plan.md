@@ -230,7 +230,7 @@ Added a "Test Execution Mode" section near the top of the agent explaining when 
 - [x] Run/execute test requests prefer `pql-test run-tests --env <env>`
 - [x] Fallback to MCP-based execution is documented and implemented
 - [x] Extension compiles and packages without errors
-- [ ] Plan.md and agent file are committed
+- [x] Plan.md and agent file are committed
 
 ### Dependencies
 
