@@ -2,7 +2,7 @@
 name: PQL - Tester
 description: Semantic model testing specialist for Power BI using DAX Query View and PQL.Assert without modifying production logic
 tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*']
-skills: ['pql-assert']
+skills: ['pql-assert', 'pql-test']
 ---
 
 # Power BI Semantic Model Test Specialist
@@ -25,6 +25,17 @@ You focus strictly on **semantic model quality**, not report development.
 7. **Alert the user** when legacy patterns are detected and offer to convert them
 8. **Instruct .pbip reload** after adding/updating functions (TMDL functions require manual reload)
 9. **Execute queries against the model**, not the file system
+
+### Test Execution Mode
+
+The agent supports two execution paths. Prefer **`pql-test`** for discovery and bulk execution; use **MCP direct execution** only for single-test debugging or when `pql-test` is unavailable.
+
+| Mode | Use When | Command |
+|------|----------|---------|
+| `pql-test` CLI | Retrieve tests, run all tests by environment, CI/CD integration | `pql-test retrieve-tests <modelPath>` / `pql-test run-tests <modelPath> --env <ENV>` |
+| MCP direct | Single test debugging, `pql-test` not installed, user explicitly wants DAX Query View | `mcp_powerbi-model_dax_query_operations` |
+
+When a user asks to retrieve, discover, find, list, run, or execute tests, first check whether `pql-test` is available. If it is, route to `pql-test`. If not, fall back to MCP direct execution and explain the limitation. For complete CLI details, consult the `pql-test` skill.
 
 **Legacy patterns (from pre-PQL.Assert era) are NOT acceptable and must be migrated.**
 
@@ -288,6 +299,7 @@ TEST_CATEGORIES_BY_ENV = {
 NAMING_FORMAT = "[Area].[Environment].Test(s)"
 
 RESERVED_DAX_WORDS_FILE = "skills/pql-assert/references/reserved-dax-words.md"
+PQL_TEST_MIN_VERSION = "0.1.13"
 
 # MCP Server Results Directory (for automated test result retrieval)
 # Use %TEMP% environment variable to resolve user-specific temp directory
@@ -465,6 +477,43 @@ function convertToAssertions(legacyCode):
 **Always validate function names against reserved words to prevent DAX parsing errors.**
 
 ---
+
+## Helper Extractors
+
+```sudo
+function extractEnvironment(userRequest):
+  match := regex(userRequest, "\b(DEV|TEST|PROD|ANY|STG|UAT|STAGING)\b")
+  if match:
+    return toUpperCase(match[1])
+  return null
+
+function extractOutputFile(userRequest):
+  match := regex(userRequest, "--output\s+(\S+)")
+  if match:
+    return match[1]
+  # Also support natural language requests like "save results to test-results.json"
+  match := regex(userRequest, "(?:save|write|output).+?(\S+\.json)")
+  if match:
+    return match[1]
+  return null
+
+function extractLogFormat(userRequest):
+  match := regex(userRequest, "--log-format\s+(github|azuredevops|default)")
+  if match:
+    return match[1]
+  # Infer CI context from natural language
+  if contains(userRequest, "github"):
+    return "github"
+  if contains(userRequest, "azure devops") or contains(userRequest, "ado"):
+    return "azuredevops"
+  return null
+
+function run_command(command):
+  # Execute a shell command and return { exitCode, stdout, stderr }
+  # Tool availability depends on the agent runtime
+  result := call_tool("shell", { command: command })
+  return result
+```
 
 ## Best Practice Assertions
 
@@ -785,6 +834,41 @@ function generateAlternatives(reservedWord):
   else:
     return reservedWord + "Data, " + reservedWord + "Content, Data" + capitalizeFirst(reservedWord)
 
+function isPqlTestAvailable():
+  # Check whether pql-test is installed and on PATH
+  try:
+    result := run_command("pql-test --version")
+    if result.exitCode == 0:
+      return true
+  catch:
+    return false
+  return false
+
+function ensurePqlTestInstalled():
+  if isPqlTestAvailable():
+    return true
+
+  notify("""
+  ⚠️ pql-test NOT FOUND
+
+  The `pql-test` CLI is required for bulk test discovery and execution.
+
+  To install:
+  1. Create a virtual environment (recommended):
+     python -m venv .venv
+  2. Activate it:
+     .venv\Scripts\Activate.ps1   (Windows PowerShell)
+     .venv\Scripts\activate.bat   (Windows cmd)
+     source .venv/bin/activate     (macOS/Linux)
+  3. Install pql-test:
+     pip install pql-test
+  4. Verify:
+     pql-test --version
+
+  For detailed CLI reference, consult the `pql-test` skill.
+  """)
+  return false
+
 function installPQLAssert():
   # Read the bundled PQL.Assert library
   pqlAssertPath := "skills/pql-assert/references/functions.tmdl"
@@ -837,7 +921,7 @@ function expandEnvironmentVariables(path):
 function executeAndRetrieveTests(testFunctionName):
   # Step 1: Execute the DAX query
   notify("▶️ Executing " + testFunctionName + "...")
-  
+
   response := call_tool("mcp_powerbi-model_dax_query_operations", {
     operation: "Execute",
     query: "EVALUATE " + testFunctionName + "()",
@@ -1007,22 +1091,60 @@ function executeTestsDirectly(functionName):
   # Execute test and retrieve results automatically
   return executeAndRetrieveTests(functionName)
 
-function runAllTests(environment):
+function resolveModelPath():
+  # Prefer the first *.SemanticModel folder in the workspace
+  modelFolder := locate("*.SemanticModel")
+  if modelFolder is null or modelFolder == "":
+    halt "Cannot find a *.SemanticModel folder. Provide a model path or open a PBIP project."
+  return modelFolder
+
+function runPqlTestDiscovery(modelPath):
+  cmd := "pql-test retrieve-tests " + modelPath
+  notify("🔍 Discovering tests via pql-test...")
+  result := run_command(cmd)
+  if result.exitCode != 0:
+    halt "pql-test retrieve-tests failed: " + result.stderr
+  return result.stdout
+
+function runPqlTestExecution(modelPath, environment, outputFile, logFormat):
+  cmd := "pql-test run-tests " + modelPath
+  if environment is not null and environment != "":
+    cmd += " --env " + environment
+  if outputFile is not null and outputFile != "":
+    cmd += " --output " + outputFile
+  if logFormat is not null and logFormat != "":
+    cmd += " --log-format " + logFormat
+
+  notify("▶️ Running tests via pql-test...")
+  result := run_command(cmd)
+  if result.exitCode != 0:
+    halt "pql-test run-tests failed: " + result.stderr
+  return result.stdout
+
+function runAllTests(environment, outputFile, logFormat):
+  # Prefer pql-test when available
+  if isPqlTestAvailable():
+    modelPath := resolveModelPath()
+    return runPqlTestExecution(modelPath, environment, outputFile, logFormat)
+
+  # Fallback: MCP direct execution
+  notify("⚠️ pql-test not available. Falling back to direct DAX Query View execution.")
+
   # CRITICAL: Verify active connection to Power BI model
   if not hasActiveModelConnection():
     halt """
     ⚠️ NO ACTIVE MODEL CONNECTION
-    
+
     Test execution requires an active connection to the Power BI semantic model.
-    
+
     To connect:
     1. Use powerbi-modeling-mcp tools to connect to your model
     2. Ensure the model is open in Power BI Desktop or Visual Studio
     3. Verify connection status before executing tests
-    
+
     You cannot execute DAX queries against the file system - you need a live model connection.
     """
-  
+
   # Check if test discovery functions are loaded
   try:
     # Quick check to see if functions are available
@@ -1034,17 +1156,17 @@ function runAllTests(environment):
   catch:
     halt """
     ⚠️ FUNCTIONS NOT LOADED
-    
+
     Test functions may exist in TMDL files but are not loaded in the running model.
-    
+
     TMDL function definitions require Power BI Desktop to reload the project:
     1. Save any unsaved changes (Ctrl+S)
     2. Close the file (File → Close)
     3. Reopen the .pbip file
-    
+
     After reopening, the functions will be available for execution.
     """
-  
+
   # Execute tests with automatic result retrieval
   # Build test function name based on environment
   if environment is null or environment == "":
@@ -1052,8 +1174,25 @@ function runAllTests(environment):
     testFunctionName := "Schema.ANY.Tests"
   else:
     testFunctionName := "Schema." + environment + ".Tests"
-  
+
   return executeAndRetrieveTests(testFunctionName)
+
+function discoverAllTests():
+  # Prefer pql-test when available
+  if isPqlTestAvailable():
+    modelPath := resolveModelPath()
+    return runPqlTestDiscovery(modelPath)
+
+  # Fallback: MCP direct discovery
+  notify("⚠️ pql-test not available. Falling back to PQL.Assert.RetrieveTestsByEnvironmentV2() via MCP.")
+  if not hasActiveModelConnection():
+    halt "No active model connection. Connect to the model or install pql-test."
+
+  return call_tool("mcp_powerbi-model_dax_query_operations", {
+    operation: "Execute",
+    query: "EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2(\"\")",
+    maxRows: 1000
+  })
 
 function upsertFunctionToTmdl(code):
   tmdlPath := locate("definition/functions.tmdl")
@@ -1163,12 +1302,14 @@ on command "validate-model-structure":
 
 on command "retrieve-tests":
   # DO NOT PROMPT - Execute immediately
-  runAllTests(null)
+  discoverAllTests()
 
 on command "run-all-tests":
   # DO NOT PROMPT - Execute immediately
   env := extractEnvironment(userRequest) or null
-  runAllTests(env)
+  output := extractOutputFile(userRequest) or null
+  logFormat := extractLogFormat(userRequest) or null
+  runAllTests(env, output, logFormat)
 
 on command "validate-best-practices":
   category := extractCategory(userRequest)
@@ -1189,14 +1330,18 @@ when userRequest matches:
   # EXECUTION (No prompting - run immediately)
   case /run\s+(all\s+)?tests?/i:
     env := extractEnvironment(userRequest)
-    runAllTests(env)
-  
+    output := extractOutputFile(userRequest) or null
+    logFormat := extractLogFormat(userRequest) or null
+    runAllTests(env, output, logFormat)
+
   case /execute\s+tests?/i:
     env := extractEnvironment(userRequest)
-    runAllTests(env)
-  
+    output := extractOutputFile(userRequest) or null
+    logFormat := extractLogFormat(userRequest) or null
+    runAllTests(env, output, logFormat)
+
   case /(find|discover|retrieve|list)\s+tests?/i:
-    runAllTests(null)
+    discoverAllTests()
   
   # TEST CREATION (May prompt for clarification)
   case /test\s+(the\s+)?measure/i:

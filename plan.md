@@ -156,3 +156,92 @@ Added an Object Level Security (OLS) section documenting the table-level and col
 - Implementing assertion logic changes (use official 0.5.0 TMDL verbatim)
 - Changes to `pql-test` skill or agents
 - Automated tests for the skill content
+
+---
+
+## PQL - Tester Agent: Use `pql-test` for Execution & Discovery
+
+**Goal**: Update the `PQL - Tester` agent (`resources/agents/power-query-tester.sudo.md`) so it prefers the `pql-test` CLI for test discovery and execution workflows, falling back to MCP-based DAX execution only when `pql-test` is unavailable or the user explicitly requests in-model execution.
+
+### Background
+
+The agent currently:
+- Lists `skills: ['pql-assert']` only — it does **not** load the `pql-test` skill.
+- Routes retrieve/run/execute/list test requests to `runAllTests()` and `executeAndRetrieveTests()`, which call `mcp_powerbi-model_dax_query_operations` directly.
+- Has no awareness of `pql-test run-tests`, `pql-test retrieve-tests`, environment filtering (`--env`), JSON output, or CI/CD log formats.
+
+This means users who ask "retrieve tests" or "run all tests" get MCP-driven single-function execution rather than the environment-scoped, CI/CD-friendly `pql-test` workflow.
+
+### Tasks
+
+#### 1. Add `pql-test` Skill to Agent
+**Status**: ✅ Complete
+
+Updated agent frontmatter:
+```yaml
+skills: ['pql-assert', 'pql-test']
+```
+
+#### 2. Detect `pql-test` Availability
+**Status**: ✅ Complete
+
+Added `isPqlTestAvailable()` and `ensurePqlTestInstalled()` helpers. `isPqlTestAvailable()` checks `pql-test --version` on PATH; `ensurePqlTestInstalled()` guides the user through venv setup and `pip install pql-test` if missing.
+
+#### 3. Prefer `pql-test` for Discovery
+**Status**: ✅ Complete
+
+Added `discoverAllTests()` which:
+- Resolves the `*.SemanticModel` folder via `resolveModelPath()`
+- Runs `pql-test retrieve-tests <modelPath>` when available
+- Falls back to `EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("")` via MCP when `pql-test` is unavailable
+
+#### 4. Prefer `pql-test` for Execution
+**Status**: ✅ Complete
+
+Added `runPqlTestExecution()` and updated `runAllTests()` to:
+- Extract environment from the request and pass `--env <env>`
+- Support `--output <file>` via `extractOutputFile()`
+- Support `--log-format github|azuredevops` via `extractLogFormat()`
+- Fall back to MCP-based execution when `pql-test` is unavailable
+
+#### 5. Update Command Handlers & Request Router
+**Status**: ✅ Complete
+
+- `on command "retrieve-tests"`: now calls `discoverAllTests()`
+- `on command "run-all-tests"`: now calls `runAllTests(env, output, logFormat)`
+- Router cases for `/run\s+(all\s+)?tests?/i`, `/execute\s+tests?/i`, and `/(find|discover|retrieve|list)\s+tests?/i` now route to the `pql-test`-preferring handlers
+
+#### 6. Document Fallback Behavior
+**Status**: ✅ Complete
+
+Added a "Test Execution Mode" section near the top of the agent explaining when to use `pql-test` (discovery, bulk execution, CI/CD) vs. MCP direct execution (single-test debugging, `pql-test` missing, explicit DAX Query View request).
+
+#### 7. Validate Packaging
+**Status**: ✅ Complete
+
+- `npm run compile` succeeded
+- `npm run package` succeeded and produced `power-query-lint-1.0.0.vsix`
+- Updated agent file is included in the package
+
+### Acceptance Criteria
+
+- [x] Agent frontmatter lists both `pql-assert` and `pql-test` skills
+- [x] Retrieve/discover/list test requests prefer `pql-test retrieve-tests`
+- [x] Run/execute test requests prefer `pql-test run-tests --env <env>`
+- [x] Fallback to MCP-based execution is documented and implemented
+- [x] Extension compiles and packages without errors
+- [ ] Plan.md and agent file are committed
+
+### Dependencies
+
+| Dependency | Status |
+|------------|--------|
+| `pql-test` skill | ✅ Exists |
+| `pql-assert` skill | ✅ Exists |
+| PQL - Tester agent | ✅ Exists |
+
+### Out of Scope
+
+- Modifying the `pql-test` skill content
+- Adding new MCP tools
+- Bundling Python/pql-test in the extension
