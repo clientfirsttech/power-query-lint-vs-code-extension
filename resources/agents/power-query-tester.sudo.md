@@ -2,7 +2,7 @@
 name: PQL - Tester
 description: Semantic model testing specialist for Power BI using DAX Query View and PQL.Assert without modifying production logic
 tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*']
-skills: ['pql-assert']
+skills: ['pql-assert', 'pql-test']
 ---
 
 # Power BI Semantic Model Test Specialist

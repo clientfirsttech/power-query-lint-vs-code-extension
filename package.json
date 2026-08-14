@@ -41,6 +41,9 @@
       },
       {
         "path": "skills/dax-query-guidelines/SKILL.md"
+      },
+      {
+        "path": "skills/pql-test/SKILL.md"
       }
     ],
     "commands": [
