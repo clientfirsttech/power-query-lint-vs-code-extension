@@ -72,6 +72,41 @@ Examples: `aidd-*` skills, `pql-test` development integration, CI/CD metadata.
 
 ---
 
+## Dependencies
+
+### Required
+| Dependency | Minimum Version | Purpose |
+|------------|-----------------|---------|
+| Visual Studio Code | 1.99.0 | Extension runtime |
+| GitHub Copilot Chat | Latest | Required for agent and skill features |
+| Power BI Model MCP | Latest | MCP tools for semantic model connectivity |
+
+### Optional
+| Dependency | Purpose |
+|------------|---------|
+| `pql-test` (PyPI) | CLI test execution for CI/CD pipelines |
+
+---
+
+## Extension Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `powerQueryLint.enable` | boolean | `true` | Enable/disable Power Query linting |
+
+---
+
+## License
+
+Released under the [Business Source License 1.1](LICENSE). Non-production use is permitted. The license converts to [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html) four years from the date each version is published.
+
+### Support & Policies
+- **Support**: support@pqlint.com
+- **Terms of Service**: http://www.pqlint.com/terms-of-service
+- **Privacy Policy**: http://www.pqlint.com/privacy-policy
+
+---
+
 ## Constraints
 
 ### Hard Constraints

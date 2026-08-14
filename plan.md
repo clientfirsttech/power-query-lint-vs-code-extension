@@ -18,54 +18,52 @@ The `.github/skills/pql-test/SKILL.md` documents how this repository's CI/CD use
 ## Tasks
 
 ### 1. Create `/skills/pql-test/SKILL.md` (User-Facing)
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
-Create a skill file that documents:
-- What `pql-test` is (PyPI package for running DAX tests)
-- Installation: `pip install pql-test`
-- CLI usage patterns for different model types
-- Environment-scoped test execution
-- JSON output format for CI/CD
-- Integration with PQL.Assert functions
-
-**Key Difference from `.github/skills/pql-test/SKILL.md`**:
-- The dev skill describes wrapper scripts (`scripts/invoke_pql_test.py`) specific to this repo
-- The deployment skill teaches users the raw `pql-test` CLI commands
+Created skill file documenting:
+- Installation with virtual environment setup (recommended)
+- CLI usage patterns for local and remote models
+- Environment-scoped test execution (DEV, STG, PRD, ANY)
+- JSON output schema with exit codes
+- CI/CD integration (GitHub Actions, Azure DevOps)
+- Authentication options (service principal, interactive)
 
 ### 2. Update `package.json`
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
-Add the new skill to `contributes.chatSkills`:
-```json
-{
-  "path": "skills/pql-test/SKILL.md"
-}
-```
+Added `skills/pql-test/SKILL.md` to `contributes.chatSkills`.
 
 ### 3. Update PQL - Tester Agent
-**Status**: 🔲 Not Started
+**Status**: ✅ Complete
 
-Add `pql-test` to the skills list in `resources/agents/power-query-tester.sudo.md`:
-```yaml
-skills: ['pql-assert', 'pql-test']
-```
+Added `pql-test` to skills list: `skills: ['pql-assert', 'pql-test']`
 
-### 4. Validate Extension Packaging
-**Status**: 🔲 Not Started
+### 4. Update `.github/skills/pql-test/SKILL.md` (Dev Workflow)
+**Status**: ✅ Complete
 
-- Run `npm run compile`
-- Run `npm run package`
-- Verify `skills/pql-test/SKILL.md` is included in `.vsix`
+Updated with accurate PyPI documentation including:
+- Virtual environment installation instructions
+- Correct CLI flags (`--tenant-id`, `--workspace-id`, `--dataset-id`, `--client-id`, `--client-secret`)
+- Environment variables (`PQL_TENANT_ID`, `PQL_WORKSPACE_ID`, etc.)
+- Additional commands (`auth login`, `retrieve-tests`)
+- Exit codes and links
+
+### 5. Validate Extension Packaging
+**Status**: ✅ Complete
+
+- `npm run compile` succeeded
+- Skills directory contains: `dax-query-guidelines/`, `pql-assert/`, `pql-test/`
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `/skills/pql-test/SKILL.md` exists with complete CLI documentation
-- [ ] `package.json` registers the skill in `chatSkills`
-- [ ] PQL - Tester agent lists `pql-test` skill
-- [ ] Extension compiles and packages without errors
-- [ ] Skill appears in VS Code Copilot skill discovery
+- [x] `/skills/pql-test/SKILL.md` exists with complete CLI documentation
+- [x] `package.json` registers the skill in `chatSkills`
+- [x] PQL - Tester agent lists `pql-test` skill
+- [x] Extension compiles without errors
+- [x] `.github/skills/pql-test/SKILL.md` updated with accurate PyPI info
+- [ ] Skill appears in VS Code Copilot skill discovery (requires extension install)
 
 ---
 

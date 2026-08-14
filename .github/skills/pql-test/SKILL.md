@@ -5,8 +5,34 @@ description: pql-test PyPI analyzer wrapper for this project. Covers CLI interfa
 
 # pql-test Analyzer
 
-Runs DAX/PQL tests defined inside a `.pbip` SemanticModel artifact using the `pql-test` PyPI package.
+Runs DAX/PQL tests defined inside a `.pbip` SemanticModel artifact using the `pql-test` PyPI package (v0.1.13+).
 All execution flows through `scripts/invoke_pql_test.py`, which wraps the CLI and writes the shared JSON envelope.
+
+## Installation
+
+### Virtual Environment Setup (Recommended)
+
+```bash
+# Create and activate virtual environment
+python -m venv .venv
+
+# Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+
+# Windows (cmd)
+.venv\Scripts\activate.bat
+
+# macOS/Linux
+source .venv/bin/activate
+
+# Install pql-test
+pip install pql-test
+
+# Verify installation
+pql-test --version
+```
+
+**Dependencies** (auto-installed): `pyadomd`, `msal`, `azure-identity`, `keyring`, `click`, `python-dotenv`, `psutil`
 
 ## Architecture
 
@@ -26,31 +52,49 @@ pytest -m pql_test  /  pytest -m pql_test_integration
 
 The wrapper calls the installed `pql-test` entry point using the `run-tests` subcommand:
 
-```
-pql-test run-tests <MODEL_PATH> \
-  [--env         <environment-label>]
-  [--workspace-id  <workspace-guid>]
-  [--output        <path-to-native-json>]
-  [--log-format    github|azuredevops]
+```bash
+pql-test run-tests <MODEL_PATH> [OPTIONS]
 ```
 
-`MODEL_PATH` formats accepted by pql-test:
+### Options
+
+| Flag | Env Variable | Description |
+|------|--------------|-------------|
+| `--env <ENV>` | — | Filter by environment: `DEV`, `STG`, `PRD`, `ANY` |
+| `--output <file>` | — | Save JSON results to file |
+| `--log-format <fmt>` | — | Output format: `default`, `azuredevops`, `github` |
+| `--tenant-id <GUID>` | `PQL_TENANT_ID` | Azure AD tenant ID |
+| `--workspace-id <GUID>` | `PQL_WORKSPACE_ID` | Power BI workspace GUID |
+| `--dataset-id <GUID>` | `PQL_DATASET_ID` | Dataset/semantic model GUID |
+| `--client-id <ID>` | `PQL_CLIENT_ID` | Service principal client ID |
+| `--client-secret <SECRET>` | `PQL_CLIENT_SECRET` | Service principal secret |
+
+### Model Path Formats
 
 | Format | Used for |
 |--------|----------|
 | `local/<model_name>` | Locally-open Power BI Desktop instance |
-| `<path/to/.SemanticModel>` | Filesystem PBIP directory (also connects to Desktop if open) |
-| `<Workspace>.Workspace/<Model>.SemanticModel` | Fabric service via XMLA |
+| `<path/to/.SemanticModel>` | Filesystem PBIP directory (auto-connects to Desktop if open) |
+
+### Additional Commands
+
+```bash
+# Authenticate with Power BI service
+pql-test auth login [--environment Public|USGov|...]
+
+# Discover tests without executing
+pql-test retrieve-tests <MODEL_PATH>
+```
 
 If `pql-test` is not on `PATH`, the wrapper falls back to:
 
-```
+```bash
 python -m pql_test run-tests …
 ```
 
 **Direct Python invocation**:
 
-```
+```bash
 python scripts/invoke_pql_test.py \
   --artifact-path .fabric/artifacts/SampleModel-PQLAssert.SemanticModel \
   --artifact-name SampleModel-PQLAssert \
@@ -59,7 +103,7 @@ python scripts/invoke_pql_test.py \
 
 **With fab-test**:
 
-```
+```bash
 fab-test pql_test [--env DEV] [--workspace-id <guid>]
 ```
 
@@ -98,8 +142,9 @@ Contract tests never call `subprocess`. They mock `invoke_pql_test.subprocess.ru
 ```
 Constraints {
   workspace_id must never be committed to the repository
-  Supply at runtime via --workspace-id CLI arg or FABRIC_WORKSPACE_ID env var
+  Supply at runtime via --workspace-id CLI arg or PQL_WORKSPACE_ID env var
   Integration tests skip automatically when workspace_id is absent
+  Service principal credentials use PQL_TENANT_ID, PQL_CLIENT_ID, PQL_CLIENT_SECRET
 }
 ```
 
@@ -132,6 +177,18 @@ Constraints {
 ## Static vs Dynamic Classification
 
 - **Static layer** (`pytest -m pql_test`): runs offline against repo files — no credentials, no network.
-- **Dynamic layer** (`pytest -m pql_test_integration`): requires a deployed model and a service principal (`FABRIC_WORKSPACE_ID`).
+- **Dynamic layer** (`pytest -m pql_test_integration`): requires a deployed model and service principal credentials (`PQL_WORKSPACE_ID`, `PQL_TENANT_ID`, `PQL_CLIENT_ID`, `PQL_CLIENT_SECRET`).
 
 Vision §2.7 hard constraint: the contract layer must always be locally verifiable.
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | All tests passed (or no tests discovered) |
+| `1` | Tests failed, error occurred, or all tests skipped |
+
+## Links
+
+- [PyPI Package](https://pypi.org/project/pql-test/)
+- [GitHub Repository](https://github.com/clientfirsttech/PQL.Assert)
