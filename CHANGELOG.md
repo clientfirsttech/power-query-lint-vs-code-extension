@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0-beta.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.0.0...v1.1.0-beta.0) (2026-08-14)
+
+### Features
+
+* add `pql-test` skill to PQL - Tester agent
+* prefer `pql-test` CLI for test discovery (`retrieve-tests`) and execution (`run-tests`)
+* support `--env`, `--output`, and `--log-format` options in test execution requests
+* fall back to MCP direct DAX execution when `pql-test` is unavailable
+
+> ⚠️ **Pre-release**: This version is intended for beta testing. Install the pre-release build from the VSIX or via the Marketplace pre-release channel.
+
 ## [1.0.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.9.0...v1.0.0) (2026-08-14)
 
 ### Features
