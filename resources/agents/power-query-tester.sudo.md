@@ -947,24 +947,18 @@ function isPqlTestAvailable():
   return findPqlTestCommand() is not null
 
 function ensurePqlTestInstalled():
-  commandPrefix := findPqlTestCommand()
-  if commandPrefix is not null:
-    installedVersion := getPqlTestVersion(commandPrefix)
-    if installedVersion is null or isVersionAtLeast(installedVersion, PQL_TEST_MIN_VERSION):
-      return true
+  if isPqlTestAvailable():
+    return true
 
-    notify(pqlTestVersionTooOldMessage(installedVersion, commandPrefix))
-    return false
-
-  # pql-test not found — attempt automatic venv setup and install
-  notify("⚠️ pql-test not found. Attempting to set up a virtual environment and install it...")
+  # Attempt automatic venv creation and install — never use system-level pip
+  notify("⚠️ pql-test not found. Creating a virtual environment (.venv) and installing pql-test...")
 
   setupResult := run_command("python -m venv .venv")
   if setupResult.exitCode != 0:
     notify("❌ Failed to create virtual environment: " + setupResult.stderr)
     return false
 
-  # Detect the pip path inside the new venv
+  # Use the venv's own pip so pql-test (and its console script) land inside the venv
   pipCmd := ".venv/Scripts/pip"
   if not exists(".venv/Scripts/pip.exe") and not exists(".venv/Scripts/pip"):
     pipCmd := ".venv/bin/pip"
@@ -974,15 +968,10 @@ function ensurePqlTestInstalled():
     notify("❌ pip install pql-test failed: " + installResult.stderr)
     return false
 
-  notify("✅ pql-test installed. Activate the virtual environment with:\n  .venv\\Scripts\\Activate.ps1   (PowerShell)\n  source .venv/bin/activate      (macOS/Linux)")
+  notify("✅ pql-test installed into .venv. To use in future sessions, activate first:\n  .venv\\Scripts\\Activate.ps1   (PowerShell)\n  source .venv/bin/activate      (macOS/Linux)")
 
-  # Re-probe now that install completed
-  commandPrefix := findPqlTestCommand()
-  if commandPrefix is null:
-    notify("⚠️ pql-test was installed but still not reachable on PATH. Activate the venv first, then retry.")
-    return false
-
-  return true
+  # Re-probe so the rest of the flow picks up the venv command prefix
+  return isPqlTestAvailable()
 
 function installPQLAssert():
   # Read the bundled PQL.Assert library
@@ -1236,65 +1225,6 @@ function runPqlTestExecution(modelPath, environment, outputFile, logFormat, comm
     halt "pql-test run-tests failed: " + result.stderr
   return result.stdout
 
-function getPqlTestVersion(commandPrefix):
-  # Returns semantic version string (e.g., "0.1.13") or null
-  try:
-    result := run_command(commandPrefix + " --version")
-    if result.exitCode != 0:
-      return null
-
-    output := trim(result.stdout + " " + result.stderr)
-    return extractSemver(output)
-  catch:
-    return null
-
-function extractSemver(text):
-  # Extract first x.y.z token from version output
-  match := regex_search(text, "([0-9]+\\.[0-9]+\\.[0-9]+)")
-  if match is null:
-    return null
-  return match.group(1)
-
-function parseSemver(version):
-  parts := split(version, ".")
-  if parts.length < 3:
-    return null
-  return {
-    major: toInteger(parts[0]),
-    minor: toInteger(parts[1]),
-    patch: toInteger(parts[2])
-  }
-
-function isVersionAtLeast(actualVersion, minimumVersion):
-  actual := parseSemver(actualVersion)
-  minimum := parseSemver(minimumVersion)
-  if actual is null or minimum is null:
-    return false
-
-  if actual.major != minimum.major:
-    return actual.major > minimum.major
-  if actual.minor != minimum.minor:
-    return actual.minor > minimum.minor
-  return actual.patch >= minimum.patch
-
-function pqlTestVersionTooOldMessage(installedVersion, commandPrefix):
-  return """
-  ⚠️ pql-test VERSION TOO OLD
-
-  Found: {installedVersion}
-  Required: {PQL_TEST_MIN_VERSION}+
-  Invocation: {commandPrefix}
-
-  The package is installed, but this version may not match current docs/agent behavior.
-
-  Upgrade in your active virtual environment:
-  1. python -m pip install --upgrade pql-test
-  2. Verify:
-     {commandPrefix} --version
-
-  If you need to continue without upgrading, re-run with MCP fallback enabled.
-  """
-
 function pqlTestNotFoundMessage():
   return """
   ⚠️ pql-test NOT FOUND
@@ -1324,17 +1254,10 @@ function runAllTests(environment, outputFile, logFormat, forceMcp):
 
   # Prefer pql-test when available
   if commandPrefix is not null:
-    installedVersion := getPqlTestVersion(commandPrefix)
-    if installedVersion is not null and not isVersionAtLeast(installedVersion, PQL_TEST_MIN_VERSION):
-      if not forceMcp:
-        halt pqlTestVersionTooOldMessage(installedVersion, commandPrefix)
+    modelPath := resolveModelPath()
+    return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
 
-      notify("⚠️ pql-test version " + installedVersion + " is below required " + PQL_TEST_MIN_VERSION + ". Falling back to direct DAX Query View execution.")
-    else:
-      modelPath := resolveModelPath()
-      return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
-
-  # pql-test not available — try to install before falling back
+  # Try to set up a venv and install before falling back to MCP
   if ensurePqlTestInstalled():
     commandPrefix := findPqlTestCommand()
     if commandPrefix is not null:
@@ -1399,17 +1322,10 @@ function discoverAllTests(forceMcp):
 
   # Prefer pql-test when available
   if commandPrefix is not null:
-    installedVersion := getPqlTestVersion(commandPrefix)
-    if installedVersion is not null and not isVersionAtLeast(installedVersion, PQL_TEST_MIN_VERSION):
-      if not forceMcp:
-        halt pqlTestVersionTooOldMessage(installedVersion, commandPrefix)
+    modelPath := resolveModelPath()
+    return runPqlTestDiscovery(modelPath, commandPrefix)
 
-      notify("⚠️ pql-test version " + installedVersion + " is below required " + PQL_TEST_MIN_VERSION + ". Falling back to PQL.Assert.RetrieveTestsByEnvironmentV2() via MCP.")
-    else:
-      modelPath := resolveModelPath()
-      return runPqlTestDiscovery(modelPath, commandPrefix)
-
-  # pql-test not available — try to install before falling back
+  # Try to set up a venv and install before falling back to MCP
   if ensurePqlTestInstalled():
     commandPrefix := findPqlTestCommand()
     if commandPrefix is not null:
