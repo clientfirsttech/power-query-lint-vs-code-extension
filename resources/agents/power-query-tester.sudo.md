@@ -1195,15 +1195,44 @@ function executeTestsDirectly(functionName):
   # Execute test and retrieve results automatically
   return executeAndRetrieveTests(functionName)
 
-function resolveModelPath():
-  # Prefer the first *.SemanticModel folder in the workspace
+function resolveModelPath(userProvidedPath):
+  if userProvidedPath is not null and userProvidedPath != "":
+    return userProvidedPath
+  # Fall back to first *.SemanticModel folder in the local workspace
   modelFolder := locate("*.SemanticModel")
   if modelFolder is null or modelFolder == "":
     halt "Cannot find a *.SemanticModel folder. Provide a model path or open a PBIP project."
   return modelFolder
 
+function isWorkspaceRequest(userRequest):
+  # Remote Fabric path when the user's message mentions "workspace"
+  return containsIgnoreCase(userRequest, "workspace")
+
+function extractModelPath(userRequest):
+  # Extract an explicit quoted or unquoted model path from the user's message.
+  # Matches: "some path.SemanticModel", some/path.SemanticModel, local/ModelName
+  quoted := regex_search(userRequest, "\"([^\"]+\\.SemanticModel[^\"]*|local/[^\"]+)\"")
+  if quoted is not null:
+    return trim(quoted.group(1))
+  unquoted := regex_search(userRequest, "([\\w.()\\-/\\\\]+\\.SemanticModel\\S*|local/\\S+)")
+  if unquoted is not null:
+    return trim(unquoted.group(1))
+  return null
+
+function ensurePqlTestAuth(commandPrefix):
+  # Check authentication status; prompt login if not authenticated
+  statusResult := run_command(commandPrefix + " auth status")
+  if statusResult.exitCode == 0:
+    return true
+
+  notify("🔐 pql-test is not authenticated. Running auth login...")
+  loginResult := run_command(commandPrefix + " auth login")
+  if loginResult.exitCode != 0:
+    halt "pql-test auth login failed. Please authenticate manually:\n  " + commandPrefix + " auth login"
+  return true
+
 function runPqlTestDiscovery(modelPath, commandPrefix):
-  cmd := commandPrefix + " retrieve-tests " + modelPath
+  cmd := commandPrefix + " retrieve-tests \"" + modelPath + "\""
   notify("🔍 Discovering tests via pql-test...")
   result := run_command(cmd)
   if result.exitCode != 0:
@@ -1211,7 +1240,7 @@ function runPqlTestDiscovery(modelPath, commandPrefix):
   return result.stdout
 
 function runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix):
-  cmd := commandPrefix + " run-tests " + modelPath
+  cmd := commandPrefix + " run-tests \"" + modelPath + "\""
   if environment is not null and environment != "":
     cmd += " --env " + environment
   if outputFile is not null and outputFile != "":
@@ -1249,19 +1278,23 @@ function pqlTestNotFoundMessage():
   For detailed CLI reference, consult the `pql-test` skill.
   """
 
-function runAllTests(environment, outputFile, logFormat, forceMcp):
+function runAllTests(environment, outputFile, logFormat, forceMcp, userModelPath, userRequest):
   commandPrefix := findPqlTestCommand()
 
   # Prefer pql-test when available
   if commandPrefix is not null:
-    modelPath := resolveModelPath()
+    if isWorkspaceRequest(userRequest):
+      ensurePqlTestAuth(commandPrefix)
+    modelPath := resolveModelPath(userModelPath)
     return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
 
   # Try to set up a venv and install before falling back to MCP
   if ensurePqlTestInstalled():
     commandPrefix := findPqlTestCommand()
     if commandPrefix is not null:
-      modelPath := resolveModelPath()
+      if isWorkspaceRequest(userRequest):
+        ensurePqlTestAuth(commandPrefix)
+      modelPath := resolveModelPath(userModelPath)
       return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
 
   if not forceMcp:
@@ -1317,19 +1350,23 @@ function runAllTests(environment, outputFile, logFormat, forceMcp):
 
   return executeAndRetrieveTests(testFunctionName)
 
-function discoverAllTests(forceMcp):
+function discoverAllTests(forceMcp, userModelPath, userRequest):
   commandPrefix := findPqlTestCommand()
 
   # Prefer pql-test when available
   if commandPrefix is not null:
-    modelPath := resolveModelPath()
+    if isWorkspaceRequest(userRequest):
+      ensurePqlTestAuth(commandPrefix)
+    modelPath := resolveModelPath(userModelPath)
     return runPqlTestDiscovery(modelPath, commandPrefix)
 
   # Try to set up a venv and install before falling back to MCP
   if ensurePqlTestInstalled():
     commandPrefix := findPqlTestCommand()
     if commandPrefix is not null:
-      modelPath := resolveModelPath()
+      if isWorkspaceRequest(userRequest):
+        ensurePqlTestAuth(commandPrefix)
+      modelPath := resolveModelPath(userModelPath)
       return runPqlTestDiscovery(modelPath, commandPrefix)
 
   if not forceMcp:
@@ -1455,7 +1492,8 @@ on command "validate-model-structure":
 on command "retrieve-tests":
   # DO NOT PROMPT - Execute immediately
   forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
-  discoverAllTests(forceMcp)
+  modelPath := extractModelPath(userRequest) or null
+  discoverAllTests(forceMcp, modelPath, userRequest)
 
 on command "run-all-tests":
   # DO NOT PROMPT - Execute immediately
@@ -1463,7 +1501,8 @@ on command "run-all-tests":
   output := extractOutputFile(userRequest) or null
   logFormat := extractLogFormat(userRequest) or null
   forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
-  runAllTests(env, output, logFormat, forceMcp)
+  modelPath := extractModelPath(userRequest) or null
+  runAllTests(env, output, logFormat, forceMcp, modelPath, userRequest)
 
 on command "validate-best-practices":
   category := extractCategory(userRequest)
@@ -1487,18 +1526,21 @@ when userRequest matches:
     output := extractOutputFile(userRequest) or null
     logFormat := extractLogFormat(userRequest) or null
     forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
-    runAllTests(env, output, logFormat, forceMcp)
+    modelPath := extractModelPath(userRequest) or null
+    runAllTests(env, output, logFormat, forceMcp, modelPath, userRequest)
 
   case /execute\s+tests?/i:
     env := extractEnvironment(userRequest)
     output := extractOutputFile(userRequest) or null
     logFormat := extractLogFormat(userRequest) or null
     forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
-    runAllTests(env, output, logFormat, forceMcp)
+    modelPath := extractModelPath(userRequest) or null
+    runAllTests(env, output, logFormat, forceMcp, modelPath, userRequest)
 
   case /(find|discover|retrieve|list)\s+tests?/i:
     forceMcp := contains(userRequest, "mcp") or contains(userRequest, "dax query view")
-    discoverAllTests(forceMcp)
+    modelPath := extractModelPath(userRequest) or null
+    discoverAllTests(forceMcp, modelPath, userRequest)
   
   # TEST CREATION (May prompt for clarification)
   case /test\s+(the\s+)?measure/i:

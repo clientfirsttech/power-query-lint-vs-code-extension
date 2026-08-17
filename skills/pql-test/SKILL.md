@@ -1,7 +1,6 @@
 ---
 name: pql-test
 description: pql-test CLI tool for running PQL.Assert DAX tests against Power BI semantic models. Use when executing tests locally or in CI/CD pipelines, discovering tests by environment, or integrating test results with automation workflows.
-user-invokable: false
 ---
 
 # pql-test — Semantic Model Test Execution CLI
@@ -12,71 +11,32 @@ CLI for discovering and running DAX tests in Power BI PBIP semantic models via X
 |---------|---------|--------|---------|
 | `pql-test` | 0.1.13 | ≥3.9 | BUSL-1.1 |
 
+## Steps
+
+1. **Check availability** — run `pql-test --version`. If not found, create a venv and install via the venv's own pip (see Installation).
+2. **Check auth** — if the user's request mentions a workspace, run `pql-test auth status`. If unauthenticated, run `pql-test auth login` before proceeding.
+3. **Resolve model path** — extract an explicit path from the user's prompt; if none is given, locate the `*.SemanticModel` folder in the local workspace. Always quote the path in the command.
+4. **Run the command** — use `pql-test run-tests "<modelPath>" [--env ENV]` for execution or `pql-test retrieve-tests "<modelPath>"` for discovery.
+
+---
+
 ## Installation
 
-### Virtual Environment Setup (Recommended)
-
 ```bash
-# Create and activate virtual environment
+# Create venv and install — always use the venv's own pip, never python -m pip
 python -m venv .venv
 
 # Windows (PowerShell)
 .venv\Scripts\Activate.ps1
 
-# Windows (cmd)
-.venv\Scripts\activate.bat
-
 # macOS/Linux
 source .venv/bin/activate
 
-# Install pql-test
 pip install pql-test
-
-# Verify installation
 pql-test --version
 ```
 
-### Global Installation
-
-```bash
-pip install pql-test
-```
-
-### Development Installation
-
-```bash
-cd python
-pip install -e .
-```
-
-### Dependencies
-
-Automatically installed: `pyadomd`, `msal`, `azure-identity`, `keyring`, `click`, `python-dotenv`, `psutil`
-
----
-
-## Quick Start
-
-### Local Power BI Desktop (Auto-Detect)
-
-```bash
-# Test a .pbip project (auto-connects to Desktop if open)
-pql-test run-tests ./Model.SemanticModel
-
-# Test by model name (requires Desktop running)
-pql-test run-tests local/SalesModel
-```
-
-### Remote Premium/Fabric XMLA
-
-```bash
-pql-test run-tests ./Model.SemanticModel \
-  --tenant-id <TENANT_GUID> \
-  --workspace-id <WORKSPACE_GUID> \
-  --dataset-id <DATASET_GUID> \
-  --client-id <APP_ID> \
-  --client-secret <SECRET>
-```
+**Dependencies** (auto-installed): `pyadomd`, `msal`, `azure-identity`, `keyring`, `click`, `python-dotenv`, `psutil`
 
 ---
 
@@ -105,10 +65,16 @@ pql-test run-tests <modelPath> [OPTIONS]
 
 #### Model Path Formats
 
-| Format | Description |
-|--------|-------------|
-| `./path/to/Model.SemanticModel` | Local .pbip project folder |
-| `local/<model_name>` | Model open in Power BI Desktop |
+| Format | Mode | Description |
+|--------|------|-------------|
+| `<workspace>.Workspace/<model>.SemanticModel` | **Service** | Canonical Fabric service path — connect to a remote workspace by display names |
+| `local/<model_name>` | Local | Connect to a locally-open Power BI Desktop instance by model name |
+| `<filesystem_path>` | File / local | Traditional PBIP root directory (default) |
+
+> **Quoting:** if the workspace or model name contains spaces or other shell metacharacters (e.g. parentheses), wrap the entire `MODEL_PATH` argument in double quotes so the shell passes it as one argument:
+> ```bash
+> pql-test run-tests "My Workspace.Workspace/Sales (2024).SemanticModel" --env DEV
+> ```
 
 ### `pql-test auth login`
 
@@ -186,89 +152,7 @@ pql-test run-tests ./Model.SemanticModel
 
 ## CI/CD Integration
 
-### GitHub Actions
-
-```yaml
-name: Semantic Model Tests
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Create virtual environment
-        run: |
-          python -m venv .venv
-          .venv\Scripts\Activate.ps1
-          pip install pql-test
-      
-      - name: Run DEV Tests
-        env:
-          PQL_TENANT_ID: ${{ secrets.TENANT_ID }}
-          PQL_WORKSPACE_ID: ${{ secrets.WORKSPACE_ID }}
-          PQL_DATASET_ID: ${{ secrets.DATASET_ID }}
-          PQL_CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          PQL_CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-        run: |
-          .venv\Scripts\Activate.ps1
-          pql-test run-tests ./Model.SemanticModel `
-            --env DEV `
-            --output test-results.json `
-            --log-format github
-      
-      - name: Upload Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: test-results.json
-```
-
-### Azure DevOps Pipelines
-
-```yaml
-trigger:
-  - main
-
-pool:
-  vmImage: 'windows-latest'
-
-steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.11'
-
-  - script: |
-      python -m venv .venv
-      call .venv\Scripts\activate.bat
-      pip install pql-test
-    displayName: 'Setup virtual environment'
-
-  - script: |
-      call .venv\Scripts\activate.bat
-      pql-test run-tests $(Build.SourcesDirectory)/Model.SemanticModel ^
-        --env STG ^
-        --output $(Build.ArtifactStagingDirectory)/test-results.json ^
-        --log-format azuredevops
-    displayName: 'Run Semantic Model Tests'
-    env:
-      PQL_TENANT_ID: $(TenantId)
-      PQL_WORKSPACE_ID: $(WorkspaceId)
-      PQL_DATASET_ID: $(DatasetId)
-      PQL_CLIENT_ID: $(ClientId)
-      PQL_CLIENT_SECRET: $(ClientSecret)
-
-  - task: PublishBuildArtifacts@1
-    inputs:
-      pathToPublish: '$(Build.ArtifactStagingDirectory)'
-      artifactName: 'TestResults'
-```
+import references/cicd-examples.md
 
 ---
 
