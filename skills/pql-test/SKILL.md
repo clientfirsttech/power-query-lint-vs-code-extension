@@ -14,9 +14,9 @@ CLI for discovering and running DAX tests in Power BI PBIP semantic models via X
 ## Steps
 
 1. **Check availability** — run `pql-test --version`. If not found, create a venv and install via the venv's own pip (see Installation).
-2. **Check auth** — if the user's request mentions a workspace, run `pql-test auth status`. If unauthenticated, run `pql-test auth login` before proceeding.
-3. **Resolve model path** — extract an explicit path from the user's prompt; if none is given, locate the `*.SemanticModel` folder in the local workspace. Always quote the path in the command.
-4. **Run the command** — use `pql-test run-tests "<modelPath>" [--env ENV]` for execution or `pql-test retrieve-tests "<modelPath>"` for discovery.
+2. **Check auth** — if the user's request mentions "workspace", run `pql-test auth status`. If unauthenticated, run `pql-test auth login` before proceeding.
+3. **Resolve model path** — if an explicit path is in the prompt, use it. If "workspace" is mentioned, extract the workspace name and model name from the prompt and build `<workspace>.Workspace/<model>.SemanticModel`. Only scan the local filesystem when no workspace is implied.
+4. **Run the command** — use `pql-test run-tests "<modelPath>" [--env ENV]` for execution or `pql-test retrieve-tests "<modelPath>"` for discovery. Always quote the model path.
 
 ---
 

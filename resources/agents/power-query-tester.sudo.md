@@ -1195,10 +1195,21 @@ function executeTestsDirectly(functionName):
   # Execute test and retrieve results automatically
   return executeAndRetrieveTests(functionName)
 
-function resolveModelPath(userProvidedPath):
+function resolveModelPath(userProvidedPath, userRequest):
   if userProvidedPath is not null and userProvidedPath != "":
     return userProvidedPath
-  # Fall back to first *.SemanticModel folder in the local workspace
+
+  if isWorkspaceRequest(userRequest):
+    # Build canonical Fabric service path from workspace + model names in the request
+    workspaceName := extractWorkspaceName(userRequest)
+    modelName := extractModelName(userRequest)
+    if workspaceName is null:
+      halt "Could not determine workspace name from your request. Please specify it explicitly, e.g. \"MyWorkspace.Workspace/Model.SemanticModel\"."
+    if modelName is null:
+      halt "Could not determine model name from your request. Please specify it explicitly, e.g. \"" + workspaceName + ".Workspace/Model.SemanticModel\"."
+    return workspaceName + ".Workspace/" + modelName + ".SemanticModel"
+
+  # Local fallback only when no workspace is implied
   modelFolder := locate("*.SemanticModel")
   if modelFolder is null or modelFolder == "":
     halt "Cannot find a *.SemanticModel folder. Provide a model path or open a PBIP project."
@@ -1207,6 +1218,24 @@ function resolveModelPath(userProvidedPath):
 function isWorkspaceRequest(userRequest):
   # Remote Fabric path when the user's message mentions "workspace"
   return containsIgnoreCase(userRequest, "workspace")
+
+function extractWorkspaceName(userRequest):
+  # Match "<name> workspace" or "<name>.Workspace" (case-insensitive)
+  match := regex_search(userRequest, "([\\w][\\w\\s\\-]*?)\\s*\\.?[Ww]orkspace", ignoreCase: true)
+  if match is not null:
+    return trim(match.group(1))
+  return null
+
+function extractModelName(userRequest):
+  # Extract bare model name (no path, no extension) — e.g. "TestingModel" from "TestingModel.SemanticModel" or context
+  match := regex_search(userRequest, "([\\w][\\w\\-]*)(?:\\.SemanticModel)?", ignoreCase: true)
+  if match is not null:
+    name := trim(match.group(1))
+    # Skip environment words and common verbs that aren't model names
+    skipWords := ["DEV", "STG", "PRD", "ANY", "TEST", "run", "the", "all", "same", "tests", "model", "workspace", "against", "in"]
+    if not containsIgnoreCase(skipWords, name):
+      return name
+  return null
 
 function extractModelPath(userRequest):
   # Extract an explicit quoted or unquoted model path from the user's message.
@@ -1285,7 +1314,7 @@ function runAllTests(environment, outputFile, logFormat, forceMcp, userModelPath
   if commandPrefix is not null:
     if isWorkspaceRequest(userRequest):
       ensurePqlTestAuth(commandPrefix)
-    modelPath := resolveModelPath(userModelPath)
+    modelPath := resolveModelPath(userModelPath, userRequest)
     return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
 
   # Try to set up a venv and install before falling back to MCP
@@ -1294,7 +1323,7 @@ function runAllTests(environment, outputFile, logFormat, forceMcp, userModelPath
     if commandPrefix is not null:
       if isWorkspaceRequest(userRequest):
         ensurePqlTestAuth(commandPrefix)
-      modelPath := resolveModelPath(userModelPath)
+      modelPath := resolveModelPath(userModelPath, userRequest)
       return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
 
   if not forceMcp:
@@ -1357,7 +1386,7 @@ function discoverAllTests(forceMcp, userModelPath, userRequest):
   if commandPrefix is not null:
     if isWorkspaceRequest(userRequest):
       ensurePqlTestAuth(commandPrefix)
-    modelPath := resolveModelPath(userModelPath)
+    modelPath := resolveModelPath(userModelPath, userRequest)
     return runPqlTestDiscovery(modelPath, commandPrefix)
 
   # Try to set up a venv and install before falling back to MCP
@@ -1366,7 +1395,7 @@ function discoverAllTests(forceMcp, userModelPath, userRequest):
     if commandPrefix is not null:
       if isWorkspaceRequest(userRequest):
         ensurePqlTestAuth(commandPrefix)
-      modelPath := resolveModelPath(userModelPath)
+      modelPath := resolveModelPath(userModelPath, userRequest)
       return runPqlTestDiscovery(modelPath, commandPrefix)
 
   if not forceMcp:
