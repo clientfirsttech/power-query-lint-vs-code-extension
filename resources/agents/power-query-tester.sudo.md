@@ -956,26 +956,33 @@ function ensurePqlTestInstalled():
     notify(pqlTestVersionTooOldMessage(installedVersion, commandPrefix))
     return false
 
-  notify("""
-  ⚠️ pql-test NOT FOUND
+  # pql-test not found — attempt automatic venv setup and install
+  notify("⚠️ pql-test not found. Attempting to set up a virtual environment and install it...")
 
-  The `pql-test` CLI is required for bulk test discovery and execution.
+  setupResult := run_command("python -m venv .venv")
+  if setupResult.exitCode != 0:
+    notify("❌ Failed to create virtual environment: " + setupResult.stderr)
+    return false
 
-  To install:
-  1. Create a virtual environment (recommended):
-     python -m venv .venv
-  2. Activate it:
-     .venv\Scripts\Activate.ps1   (Windows PowerShell)
-     .venv\Scripts\activate.bat   (Windows cmd)
-     source .venv/bin/activate     (macOS/Linux)
-  3. Install pql-test:
-     pip install pql-test
-  4. Verify:
-     pql-test --version
+  # Detect the pip path inside the new venv
+  pipCmd := ".venv/Scripts/pip"
+  if not exists(".venv/Scripts/pip.exe") and not exists(".venv/Scripts/pip"):
+    pipCmd := ".venv/bin/pip"
 
-  For detailed CLI reference, consult the `pql-test` skill.
-  """)
-  return false
+  installResult := run_command(pipCmd + " install pql-test")
+  if installResult.exitCode != 0:
+    notify("❌ pip install pql-test failed: " + installResult.stderr)
+    return false
+
+  notify("✅ pql-test installed. Activate the virtual environment with:\n  .venv\\Scripts\\Activate.ps1   (PowerShell)\n  source .venv/bin/activate      (macOS/Linux)")
+
+  # Re-probe now that install completed
+  commandPrefix := findPqlTestCommand()
+  if commandPrefix is null:
+    notify("⚠️ pql-test was installed but still not reachable on PATH. Activate the venv first, then retry.")
+    return false
+
+  return true
 
 function installPQLAssert():
   # Read the bundled PQL.Assert library
@@ -1327,11 +1334,18 @@ function runAllTests(environment, outputFile, logFormat, forceMcp):
       modelPath := resolveModelPath()
       return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
 
+  # pql-test not available — try to install before falling back
+  if ensurePqlTestInstalled():
+    commandPrefix := findPqlTestCommand()
+    if commandPrefix is not null:
+      modelPath := resolveModelPath()
+      return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
+
   if not forceMcp:
     halt pqlTestNotFoundMessage()
 
   # Fallback: MCP direct execution
-  notify("⚠️ pql-test not available. Falling back to direct DAX Query View execution.")
+  notify("⚠️ pql-test unavailable after install attempt. Falling back to direct DAX Query View execution.")
 
   # CRITICAL: Verify active connection to Power BI model
   if not hasActiveModelConnection():
@@ -1395,11 +1409,18 @@ function discoverAllTests(forceMcp):
       modelPath := resolveModelPath()
       return runPqlTestDiscovery(modelPath, commandPrefix)
 
+  # pql-test not available — try to install before falling back
+  if ensurePqlTestInstalled():
+    commandPrefix := findPqlTestCommand()
+    if commandPrefix is not null:
+      modelPath := resolveModelPath()
+      return runPqlTestDiscovery(modelPath, commandPrefix)
+
   if not forceMcp:
     halt pqlTestNotFoundMessage()
 
   # Fallback: MCP direct discovery
-  notify("⚠️ pql-test not available. Falling back to PQL.Assert.RetrieveTestsByEnvironmentV2() via MCP.")
+  notify("⚠️ pql-test unavailable after install attempt. Falling back to PQL.Assert.RetrieveTestsByEnvironmentV2() via MCP.")
   if not hasActiveModelConnection():
     halt "No active model connection. Connect to the model or install pql-test."
 
