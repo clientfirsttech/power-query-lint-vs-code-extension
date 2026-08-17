@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.7](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.1.6...v1.1.7) (2026-08-17)
+
+
+### Features
+
+* **tester:** enhance pql-test functionality with user-provided model paths and authentication checks ([2390d2d](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/commit/2390d2dde2e598fb91dba79a78b722011f0af4be))
+
 ### [1.1.6](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.1.5...v1.1.6) (2026-08-17)
 
 
