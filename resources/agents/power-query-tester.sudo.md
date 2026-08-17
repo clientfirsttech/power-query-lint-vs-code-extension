@@ -313,7 +313,8 @@ POWERBI_MCP_RESULTS_DIR = "%TEMP%\\PowerBIModelingMCP\\QueryResults"
 # Common DAX reserved words to check (full list in reserved-dax-words.md)
 COMMON_RESERVED_WORDS = [
   "Content", "Model", "Table", "Date", "Filter", "Calculate",
-  "Column", "Measure", "Row", "Value", "Data", "Function"
+  "Column", "Measure", "Row", "Value", "Data", "Function",
+  "Relationship"
 ]
 
 RESERVED_WORD_REPLACEMENTS = {
@@ -322,7 +323,8 @@ RESERVED_WORD_REPLACEMENTS = {
   "Table": "TableData",
   "Date": "DateData",
   "Filter": "FilterData",
-  "Calculate": "CalculationData"
+  "Calculate": "CalculationData",
+  "Relationship": "Relationships"
 }
 
 ---
@@ -508,6 +510,88 @@ function extractLogFormat(userRequest):
     return "azuredevops"
   return null
 
+function extractOldName(userRequest):
+  # Match quoted name, backtick name, or the word after "rename" / "from"
+  match := regex(userRequest, "(?:rename|from)\\s+['\"`]([^'\"`]+)['\"`]")
+  if match:
+    return match[1]
+  match := regex(userRequest, "(?:rename|from)\\s+(\\S+)\\s+(?:to|as)")
+  if match:
+    return match[1]
+  return null
+
+function extractNewName(userRequest):
+  match := regex(userRequest, "(?:to|as)\\s+['\"`]([^'\"`]+)['\"`]")
+  if match:
+    return match[1]
+  match := regex(userRequest, "(?:to|as)\\s+(\\S+)")
+  if match:
+    return match[1]
+  return null
+
+function extractEnvironmentFromName(functionName):
+  segments := split(functionName, ".")
+  if segments.length >= 2:
+    env := toUpperCase(segments[1])
+    if env in ENVIRONMENTS:
+      return env
+  return "ANY"
+
+function renameTest(oldName, newName):
+  if oldName is null or oldName == "":
+    halt "Please provide the current test name to rename."
+  if newName is null or newName == "":
+    halt "Please provide the new test name."
+
+  # CRITICAL: Validate the new name against reserved words BEFORE any changes
+  validateFunctionName(newName)
+
+  ensureModelConnection()
+  if not verifyPQLAssert():
+    halt "PQL.Assert not installed"
+
+  oldDefinition := getFunctionDefinitionFromTmdl(oldName)
+  if oldDefinition is null:
+    halt "Test function '" + oldName + "' not found."
+
+  # Replace function name in TMDL definition
+  newDefinition := replace(oldDefinition, "'" + oldName + "'", "'" + newName + "'")
+  newDefinition := replace(newDefinition, oldName + "(", newName + "(")
+
+  # Update functions.tmdl
+  removeFunctionFromTmdl(oldName)
+  upsertFunctionToTmdl({
+    functionName: newName,
+    definition: newDefinition,
+    queryCall: "EVALUATE " + newName + "()",
+    environment: extractEnvironmentFromName(newName)
+  })
+
+  # Update .dax file
+  modelFolder := locate("*.SemanticModel")
+  oldDaxPath := modelFolder + "/DAXQueries/" + oldName + ".dax"
+  newDaxPath := modelFolder + "/DAXQueries/" + newName + ".dax"
+  if exists(oldDaxPath):
+    daxContent := read(oldDaxPath)
+    newDaxContent := replace(daxContent, oldName + "()", newName + "()")
+    write_file(newDaxPath, newDaxContent)
+    delete_file(oldDaxPath)
+
+  # Update daxQueries.json tabOrder
+  jsonPath := locate("DAXQueries/.pbi/daxQueries.json")
+  if exists(jsonPath):
+    config := read_json(jsonPath)
+    config.tabOrder := filter(config.tabOrder, item != oldName)
+    if newName not in config.tabOrder:
+      config.tabOrder.append(newName)
+    if config.defaultTab == oldName:
+      config.defaultTab := newName
+    write_json(jsonPath, config)
+
+  refreshModelConnection()
+  notify("✅ Renamed test '" + oldName + "' to '" + newName + "'.")
+  return "await_user_reload"
+
 function run_command(command):
   # Execute a shell command and return { exitCode, stdout, stderr }
   # VS Code agent runtime exposes the shell execution tool as "execute"
@@ -573,8 +657,8 @@ function createTest(userRequest):
   # Generate test code (includes reserved word validation)
   code := generateTestCode(testType, targets, env)
   
-  # Code generation already validated function name
-  # No need to validate again here
+  # CRITICAL: Re-validate before any file write as a final guard
+  validateFunctionName(code.functionName)
   
   upsertFunctionToTmdl(code)
   createDaxFile(code)
@@ -839,9 +923,12 @@ function generateAlternatives(reservedWord):
 
 function findPqlTestCommand():
   # Find a working pql-test invocation.
-  # Returns the command prefix (e.g., "pql-test" or "python -m pql_test") or null.
+  # Returns the command prefix (e.g., "pql-test" or "python -m pql_test.cli") or null.
   candidates := [
     "pql-test",
+    "python -m pql_test.cli",
+    "python3 -m pql_test.cli",
+    "py -m pql_test.cli",
     "python -m pql_test",
     "python3 -m pql_test",
     "py -m pql_test"
@@ -860,8 +947,14 @@ function isPqlTestAvailable():
   return findPqlTestCommand() is not null
 
 function ensurePqlTestInstalled():
-  if isPqlTestAvailable():
-    return true
+  commandPrefix := findPqlTestCommand()
+  if commandPrefix is not null:
+    installedVersion := getPqlTestVersion(commandPrefix)
+    if installedVersion is null or isVersionAtLeast(installedVersion, PQL_TEST_MIN_VERSION):
+      return true
+
+    notify(pqlTestVersionTooOldMessage(installedVersion, commandPrefix))
+    return false
 
   notify("""
   ⚠️ pql-test NOT FOUND
@@ -1136,6 +1229,65 @@ function runPqlTestExecution(modelPath, environment, outputFile, logFormat, comm
     halt "pql-test run-tests failed: " + result.stderr
   return result.stdout
 
+function getPqlTestVersion(commandPrefix):
+  # Returns semantic version string (e.g., "0.1.13") or null
+  try:
+    result := run_command(commandPrefix + " --version")
+    if result.exitCode != 0:
+      return null
+
+    output := trim(result.stdout + " " + result.stderr)
+    return extractSemver(output)
+  catch:
+    return null
+
+function extractSemver(text):
+  # Extract first x.y.z token from version output
+  match := regex_search(text, "([0-9]+\\.[0-9]+\\.[0-9]+)")
+  if match is null:
+    return null
+  return match.group(1)
+
+function parseSemver(version):
+  parts := split(version, ".")
+  if parts.length < 3:
+    return null
+  return {
+    major: toInteger(parts[0]),
+    minor: toInteger(parts[1]),
+    patch: toInteger(parts[2])
+  }
+
+function isVersionAtLeast(actualVersion, minimumVersion):
+  actual := parseSemver(actualVersion)
+  minimum := parseSemver(minimumVersion)
+  if actual is null or minimum is null:
+    return false
+
+  if actual.major != minimum.major:
+    return actual.major > minimum.major
+  if actual.minor != minimum.minor:
+    return actual.minor > minimum.minor
+  return actual.patch >= minimum.patch
+
+function pqlTestVersionTooOldMessage(installedVersion, commandPrefix):
+  return """
+  ⚠️ pql-test VERSION TOO OLD
+
+  Found: {installedVersion}
+  Required: {PQL_TEST_MIN_VERSION}+
+  Invocation: {commandPrefix}
+
+  The package is installed, but this version may not match current docs/agent behavior.
+
+  Upgrade in your active virtual environment:
+  1. python -m pip install --upgrade pql-test
+  2. Verify:
+     {commandPrefix} --version
+
+  If you need to continue without upgrading, re-run with MCP fallback enabled.
+  """
+
 function pqlTestNotFoundMessage():
   return """
   ⚠️ pql-test NOT FOUND
@@ -1155,7 +1307,7 @@ function pqlTestNotFoundMessage():
      pql-test --version
 
   If `pql-test` is already installed but not on PATH, you can also run:
-     python -m pql_test --version
+      python -m pql_test.cli --version
 
   For detailed CLI reference, consult the `pql-test` skill.
   """
@@ -1165,8 +1317,15 @@ function runAllTests(environment, outputFile, logFormat, forceMcp):
 
   # Prefer pql-test when available
   if commandPrefix is not null:
-    modelPath := resolveModelPath()
-    return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
+    installedVersion := getPqlTestVersion(commandPrefix)
+    if installedVersion is not null and not isVersionAtLeast(installedVersion, PQL_TEST_MIN_VERSION):
+      if not forceMcp:
+        halt pqlTestVersionTooOldMessage(installedVersion, commandPrefix)
+
+      notify("⚠️ pql-test version " + installedVersion + " is below required " + PQL_TEST_MIN_VERSION + ". Falling back to direct DAX Query View execution.")
+    else:
+      modelPath := resolveModelPath()
+      return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
 
   if not forceMcp:
     halt pqlTestNotFoundMessage()
@@ -1226,8 +1385,15 @@ function discoverAllTests(forceMcp):
 
   # Prefer pql-test when available
   if commandPrefix is not null:
-    modelPath := resolveModelPath()
-    return runPqlTestDiscovery(modelPath, commandPrefix)
+    installedVersion := getPqlTestVersion(commandPrefix)
+    if installedVersion is not null and not isVersionAtLeast(installedVersion, PQL_TEST_MIN_VERSION):
+      if not forceMcp:
+        halt pqlTestVersionTooOldMessage(installedVersion, commandPrefix)
+
+      notify("⚠️ pql-test version " + installedVersion + " is below required " + PQL_TEST_MIN_VERSION + ". Falling back to PQL.Assert.RetrieveTestsByEnvironmentV2() via MCP.")
+    else:
+      modelPath := resolveModelPath()
+      return runPqlTestDiscovery(modelPath, commandPrefix)
 
   if not forceMcp:
     halt pqlTestNotFoundMessage()

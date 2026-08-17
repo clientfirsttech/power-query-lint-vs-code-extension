@@ -42,7 +42,7 @@ pytest -m pql_test  /  pytest -m pql_test_integration
         └─ scripts/invoke_pql_test.py          ← Python wrapper (entry point)
                 │
                 ├─ pql-test CLI  (shutil.which)
-                │     fallback: python -m pql_test
+                │     fallback: python -m pql_test.cli
                 │
                 ├─ analyzer-results/pql_test/<artifact-stem>/native.json   ← raw CLI output
                 └─ analyzer-results/pql_test/<artifact-stem>/envelope.json ← shared envelope
@@ -89,7 +89,7 @@ pql-test retrieve-tests <MODEL_PATH>
 If `pql-test` is not on `PATH`, the wrapper falls back to:
 
 ```bash
-python -m pql_test run-tests …
+python -m pql_test.cli run-tests …
 ```
 
 **Direct Python invocation**:
