@@ -2,6 +2,65 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.7](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.1.6...v1.1.7) (2026-08-17)
+
+
+### Features
+
+* **tester:** enhance pql-test functionality with user-provided model paths and authentication checks ([2390d2d](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/commit/2390d2dde2e598fb91dba79a78b722011f0af4be))
+
+### [1.1.6](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.1.5...v1.1.6) (2026-08-17)
+
+
+### Features
+
+* **tester:** streamline pql-test installation with automatic venv setup and remove version checks ([c351771](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/commit/c351771845bd2ff7dbd3b5d37fd29e4a7f213a0e))
+
+### [1.1.5](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.1.4...v1.1.5) (2026-08-17)
+
+### [1.1.4](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.1.1...v1.1.4) (2026-08-17)
+
+
+### Features
+
+* **tester:** enhance pql-test installation process with automatic venv setup and improved error handling ([6358a84](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/commit/6358a84f5b823f6fff8d5a6deaec6cefc359e0b3))
+* **tester:** update fallback command for pql-test and enhance version checks ([8271ab3](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/commit/8271ab362c1fac73f304986944ae78d38ebda23d))
+
+## [1.1.1](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.1.0...v1.1.1) (2026-08-14)
+
+### Bug Fixes
+
+* declare `execute` tool in PQL - Tester agent so shell commands can run
+* detect `pql-test` via CLI and `python -m pql_test` module fallback
+* surface clear install instructions instead of silently falling back to MCP
+
+### Features
+
+* add `forceMcp` routing so users can still request DAX Query View / MCP execution explicitly
+
+> ⚠️ **Pre-release**: This version is published as a VS Code Marketplace pre-release (odd minor version). Users must opt in via the pre-release channel.
+
+## [1.1.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v1.0.0...v1.1.0) (2026-08-14)
+
+### Features
+
+* add `pql-test` skill to PQL - Tester agent
+* prefer `pql-test` CLI for test discovery (`retrieve-tests`) and execution (`run-tests`)
+* support `--env`, `--output`, and `--log-format` options in test execution requests
+* fall back to MCP direct DAX execution when `pql-test` is unavailable
+
+> ⚠️ **Pre-release**: This version is published as a VS Code Marketplace pre-release (odd minor version). Users must opt in via the pre-release channel.
+
+## [1.0.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.9.0...v1.0.0) (2026-08-14)
+
+### Features
+
+* update pql-assert skill to PQL.Assert DAX Library 0.5.0 from DAX Lib
+* add Perspective assertions: `PQL.Assert.Perspective.ShouldExist`, `ShouldContain`, `ShouldMatchSchema`
+* add Partition assertions: `PQL.Assert.Partitions.ShouldExist`, `ShouldBe`, `ShouldBeAtLeast`
+* document Object Level Security (OLS) assertions: `PQL.Assert.OLS.TableShouldBeHidden`, `TableShouldBeVisible`, `ColumnShouldBeHidden`, `ColumnShouldBeVisible`
+* update V2 test discovery documentation to include `[PQLAssert_RoleName]` metadata and OLS/RLS execution guidance
+
 ## [0.9.0](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.8.0...v0.9.0) (2026-05-13)
 
 ### [0.7.1](https://github.com/clientfirsttech/power-query-lint-vs-code-extension/compare/v0.7.0...v0.7.1) (2026-03-12)
