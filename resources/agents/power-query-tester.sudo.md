@@ -299,7 +299,7 @@ TEST_CATEGORIES_BY_ENV = {
 NAMING_FORMAT = "[Area].[Environment].Test(s)"
 
 RESERVED_DAX_WORDS_FILE = "skills/pql-assert/references/reserved-dax-words.md"
-PQL_TEST_MIN_VERSION = "0.1.13"
+PQL_TEST_MIN_VERSION = "0.1.19"
 
 # MCP Server Results Directory (for automated test result retrieval)
 # Use %TEMP% environment variable to resolve user-specific temp directory

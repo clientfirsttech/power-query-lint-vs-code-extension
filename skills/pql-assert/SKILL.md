@@ -12,6 +12,8 @@ A comprehensive DAX assertion library for writing unit tests in Power BI and Ana
 
 ### Installation
 
+Current version: **PQL.Assert 0.7.0** ([DAX Lib](https://daxlib.org/package/PQL.Assert/)). Install it from DAX Lib, or:
+
 1. Load the [`functions.tmdl`](references/functions.tmdl) file (located in the extension's `skills/pql-assert/references/` folder) into your semantic model
 2. Refresh the model to make functions available
 3. Start writing tests using PQL.Assert functions
@@ -115,9 +117,25 @@ EVALUATE PQL.Assert.ShouldEqual("Test 1: 2+2 should equal 4", 4, 2+2)
 - `PQL.Assert.Col.TextCaseShouldBeLower(testName, columnRef)` - Asserts all text values are lowercase
 - `PQL.Assert.Col.TextLengthShouldBeInRange(testName, columnRef, minLen, maxLen)` - Asserts text lengths fall within the specified range
 
+#### Text Pattern Checks
+
+All take an optional trailing `matchCase` argument (`"Y"`, `"YES"`, `"TRUE"`, or `"1"` for case-sensitive; default `""` is case-insensitive). Blank values are ignored.
+
+- `PQL.Assert.Col.ShouldStartWith(testName, columnRef, prefix [, matchCase])` - Asserts every non-blank value starts with the prefix
+- `PQL.Assert.Col.ShouldNotStartWith(testName, columnRef, prefix [, matchCase])` - Asserts no non-blank value starts with the prefix
+- `PQL.Assert.Col.ShouldEndWith(testName, columnRef, suffix [, matchCase])` - Asserts every non-blank value ends with the suffix
+- `PQL.Assert.Col.ShouldNotEndWith(testName, columnRef, suffix [, matchCase])` - Asserts no non-blank value ends with the suffix
+- `PQL.Assert.Col.ShouldContainString(testName, columnRef, substring [, matchCase])` - Asserts every non-blank value contains the substring
+- `PQL.Assert.Col.ShouldNotContainString(testName, columnRef, substring [, matchCase])` - Asserts no non-blank value contains the substring
+
+```dax
+EVALUATE PQL.Assert.Col.ShouldStartWith("SKU should start with 'SKU-'", 'Products'[SKU], "SKU-", "Y")
+```
+
 #### Schema & Existence
 
 - `PQL.Assert.Col.ShouldExist(testName, tableName, columnName)` - Asserts column exists
+- `PQL.Assert.Col.IsAvailableInMDX(testName, tableName, columnName)` - Asserts column is available for MDX queries (prevents problems for downstream Analyze in Excel users). Takes table and column **names** (strings), not a column reference. Returns an extra `IsMDXActive` column.
 
 ### Table Assertions
 
@@ -136,7 +154,15 @@ EVALUATE PQL.Assert.ShouldEqual("Test 1: 2+2 should equal 4", 4, 2+2)
 
 ### Relationship Assertions
 
-- `PQL.Assert.Relationship.ShouldExist(testName, fromTable, fromColumn, toTable, toColumn)` - Asserts relationship exists
+- `PQL.Assert.Relationship.ShouldExist(testName, fromTable, fromColumn, toTable, toColumn [, fromCardinality [, toCardinality [, securityFilteringBehavior]]])` - Asserts relationship exists. Optional checks (pass `""` or omit to skip): `fromCardinality`/`toCardinality` = `"One"` or `"Many"`; `securityFilteringBehavior` = `"OneDirection"` or `"BothDirections"`
+
+```dax
+EVALUATE PQL.Assert.Relationship.ShouldExist(
+    "Sales-Customer is Many-to-One, single direction",
+    "Sales", "CustomerID", "Customers", "CustomerID",
+    "Many", "One", "OneDirection"
+)
+```
 
 ### Perspective Assertions
 
