@@ -1,8 +1,28 @@
 {
   "bumpFiles": [
-    { "filename": "package.json", "type": "json" },
-    { "filename": "package-lock.json", "type": "json" },
-    { "filename": "skills/pql-assert/SKILL.md", "updater": "scripts/skill-version-updater.js" },
-    { "filename": "skills/pql-test/SKILL.md", "updater": "scripts/skill-version-updater.js" }
+    {
+      "filename": "package.json",
+      "type": "json"
+    },
+    {
+      "filename": "package-lock.json",
+      "type": "json"
+    },
+    {
+      "filename": "skills/pql-assert/SKILL.md",
+      "updater": "scripts/skill-version-updater.js"
+    },
+    {
+      "filename": "skills/pql-test/SKILL.md",
+      "updater": "scripts/skill-version-updater.js"
+    },
+    {
+      "filename": "resources/agents/power-query-linter.md",
+      "updater": "scripts/skill-version-updater.js"
+    },
+    {
+      "filename": "resources/agents/power-query-tester.sudo.md",
+      "updater": "scripts/skill-version-updater.js"
+    }
   ]
 }

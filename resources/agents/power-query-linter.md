@@ -1,5 +1,6 @@
 ---
 name: PQL - Linter
+version: 1.2.1
 description: Lints and fixes Power Query M code and TMDL code using the PQ Lint rule engine. Identifies best practice violations and potential issues, then applies automated fixes using AI-driven fix instructions.
 tools: ['read', 'agent', 'edit', 'search', 'powerbi-modeling-mcp/*', 'pqlint-mcp/*']
 ---
