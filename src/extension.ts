@@ -45,13 +45,18 @@ export function activate(context: vscode.ExtensionContext) {
 /**
  * Ensures MCP inputs and chat tools settings are configured
  */
+interface McpInput {
+  id?: string;
+  [key: string]: unknown;
+}
+
 async function configureMcpSettings() {
   const config = vscode.workspace.getConfiguration();
 
   // Ensure mcp.inputs includes the subscription key prompt
-  const mcpInputs = config.get<any[]>('mcp.inputs', []);
+  const mcpInputs = config.get<McpInput[]>('mcp.inputs', []);
   const hasSubscriptionKey = mcpInputs.some(
-    (input: any) => input.id === 'OCP_APIM_SUBSCRIPTION_KEY'
+    (input) => input.id === 'OCP_APIM_SUBSCRIPTION_KEY'
   );
 
   if (!hasSubscriptionKey) {
@@ -68,7 +73,7 @@ async function configureMcpSettings() {
   }
 
   // Ensure the pqlint-mcp server is registered
-  const mcpServers = config.get<Record<string, any>>('mcp.servers', {});
+  const mcpServers = config.get<Record<string, unknown>>('mcp.servers', {});
   if (!mcpServers['pqlint-mcp']) {
     const updatedServers = {
       ...mcpServers,
