@@ -63,7 +63,9 @@ For information about development, building, testing, and publishing this extens
 
 ## License
 
-Released under the [Business Source License 1.1](LICENSE). Non-production use is permitted. The license converts to [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html) four years from the date each version is published.
+Released under the [Business Source License 1.1](LICENSE). Non-production use is permitted, and the Additional Use Grant allows production use to test, validate, or monitor Power BI / Microsoft Fabric semantic models, provided the work is not offered to third parties as a competing hosted, managed, or embedded product or service. The license converts to [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html) four years from the date each version is published.
+
+Portions of this extension are derived from third-party works under their own licenses (for example, the `semantic-model-authoring` skill from [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric), MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Links
 

@@ -33,7 +33,7 @@ A Visual Studio Code extension providing comprehensive Power Query linting and s
 | Skill | Purpose |
 |-------|---------|
 | `pql-assert` | PQL.Assert DAX assertion library reference |
-| `dax-query-guidelines` | DAX query language best practices |
+| `semantic-model-authoring` | Semantic model authoring and DAX guidelines (from microsoft/skills-for-fabric, MIT) |
 | `pql-test` | pql-test CLI usage and integration |
 
 ### `/resources/agents/` — Extension Deployment Agents
