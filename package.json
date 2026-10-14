@@ -82,7 +82,9 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build:agents && npm run compile",
+    "build:agents": "node scripts/build-agents.js",
+    "check:agents": "node scripts/build-agents.js --check",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",

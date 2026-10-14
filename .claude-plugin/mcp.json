@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "powerbi-modeling-mcp": {
+      "command": "npx",
+      "args": ["-y", "@microsoft/powerbi-modeling-mcp@latest", "--start"]
+    },
+    "pqlint-mcp": {
+      "type": "http",
+      "url": "https://pqlint.com/api/mcp",
+      "headers": {
+        "Ocp-Apim-Subscription-Key": "${OCP_APIM_SUBSCRIPTION_KEY}"
+      }
+    }
+  }
+}

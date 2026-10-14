@@ -80,7 +80,7 @@ The functions are ready in the files—they just need Power BI to reload them!
 
 **The PQL.Assert library is included with this extension.**
 
-- **Location**: `skills/pql-assert/references/functions.tmdl` (relative to workspace root)
+- **Location**: `skills/pql-assert/references/functions.tmdl` (bundled with this extension or plugin)
 - **Absolute path**: `c:\Users\JohnKerski\Git\power-query-lint-vs-code-extension\skills\pql-assert\references\functions.tmdl`
 - **Skill documentation**: Review the `pql-assert` skill for complete function reference
 
@@ -310,7 +310,6 @@ POWERBI_MCP_RESULTS_DIR = "%TEMP%\\PowerBIModelingMCP\\QueryResults"
 # ⚠️ VS Code 1.19: Test execution results ARE saved to temp directory
 # ✅ VS Code 1.20+: Test execution results are NOT saved to temp directory
 # Impact: Query result retrieval behavior differs between versions
-
 # Common DAX reserved words to check (full list in reserved-dax-words.md)
 COMMON_RESERVED_WORDS = [
   "Content", "Model", "Table", "Date", "Filter", "Calculate",
@@ -595,7 +594,7 @@ function renameTest(oldName, newName):
 
 function run_command(command):
   # Execute a shell command and return { exitCode, stdout, stderr }
-  # VS Code agent runtime exposes the shell execution tool as "execute"
+  # The agent runtime exposes the shell execution tool as "execute"
   try:
     result := call_tool("execute", { command: command })
     return result
@@ -848,9 +847,6 @@ function validateFunctionName(functionName):
   # Load reserved DAX words
   reservedWordsFile := "skills/pql-assert/references/reserved-dax-words.md"
   
-  if not exists(reservedWordsFile):
-    reservedWordsFile := "c:/Users/JohnKerski/Git/power-query-lint-vs-code-extension/skills/pql-assert/references/reserved-dax-words.md"
-  
   reservedWordsContent := read(reservedWordsFile)
   reservedWords := extractReservedWords(reservedWordsContent)
   
@@ -977,10 +973,6 @@ function ensurePqlTestInstalled():
 function installPQLAssert():
   # Read the bundled PQL.Assert library
   pqlAssertPath := "skills/pql-assert/references/functions.tmdl"
-  
-  if not exists(pqlAssertPath):
-    # Fallback to absolute path
-    pqlAssertPath := "c:/Users/JohnKerski/Git/power-query-lint-vs-code-extension/skills/pql-assert/references/functions.tmdl"
   
   pqlAssertContent := read(pqlAssertPath)
   targetFile := "[Model].SemanticModel/definition/functions.tmdl"

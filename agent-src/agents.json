@@ -1,0 +1,85 @@
+{
+  "plugin": "power-query-lint",
+  "tokens": {
+    "copilot": {
+      "execute": "execute",
+      "dax_query_operations": "mcp_powerbi-model_dax_query_operations",
+      "model_operations": "model_operations",
+      "lint_code": "pqlint-mcp lint_code",
+      "get_lint_rules": "pqlint-mcp get_lint_rules"
+    },
+    "claude": {
+      "execute": "Bash",
+      "dax_query_operations": "mcp__plugin_power-query-lint_powerbi-modeling-mcp__dax_query_operations",
+      "model_operations": "mcp__plugin_power-query-lint_powerbi-modeling-mcp__model_operations",
+      "lint_code": "mcp__plugin_power-query-lint_pqlint-mcp__lint_code",
+      "get_lint_rules": "mcp__plugin_power-query-lint_pqlint-mcp__get_lint_rules"
+    }
+  },
+  "agents": [
+    {
+      "id": "linter",
+      "description": "Lints and fixes Power Query M code and TMDL code using the PQ Lint rule engine. Identifies best practice violations and potential issues, then applies automated fixes using AI-driven fix instructions.",
+      "body": "agent-src/linter.body.md",
+      "copilot": {
+        "file": "resources/agents/power-query-linter.md",
+        "name": "PQL - Linter",
+        "tools": [
+          "read",
+          "agent",
+          "edit",
+          "search",
+          "powerbi-modeling-mcp/*",
+          "pqlint-mcp/*"
+        ]
+      },
+      "claude": {
+        "file": "agents/pql-linter.md",
+        "name": "pql-linter",
+        "tools": [
+          "Read",
+          "Edit",
+          "Grep",
+          "Glob",
+          "Agent",
+          "mcp__plugin_power-query-lint_powerbi-modeling-mcp__*",
+          "mcp__plugin_power-query-lint_pqlint-mcp__*"
+        ]
+      }
+    },
+    {
+      "id": "tester",
+      "description": "Semantic model testing specialist for Power BI using DAX Query View and PQL.Assert without modifying production logic",
+      "body": "agent-src/tester.body.md",
+      "copilot": {
+        "file": "resources/agents/power-query-tester.sudo.md",
+        "name": "PQL - Tester",
+        "tools": [
+          "read",
+          "agent",
+          "edit",
+          "search",
+          "execute",
+          "powerbi-modeling-mcp/*"
+        ],
+        "skills": [
+          "pql-assert",
+          "pql-test"
+        ]
+      },
+      "claude": {
+        "file": "agents/pql-tester.md",
+        "name": "pql-tester",
+        "tools": [
+          "Read",
+          "Edit",
+          "Grep",
+          "Glob",
+          "Agent",
+          "Bash",
+          "mcp__plugin_power-query-lint_powerbi-modeling-mcp__*"
+        ]
+      }
+    }
+  ]
+}
