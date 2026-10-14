@@ -1,5 +1,6 @@
 ---
 name: pql-test
+version: 1.2.1
 description: pql-test CLI tool for running PQL.Assert DAX tests against Power BI semantic models. Use when executing tests locally or in CI/CD pipelines, discovering tests by environment, measuring test coverage, or integrating test results with automation workflows.
 ---
 

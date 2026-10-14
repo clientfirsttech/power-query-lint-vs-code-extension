@@ -16,3 +16,5 @@ plan.md
 vision.md
 CONTRIBUTING.md
 package-lock.json
+scripts/**
+.versionrc.json

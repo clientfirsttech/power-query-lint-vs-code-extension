@@ -1,0 +1,8 @@
+{
+  "bumpFiles": [
+    { "filename": "package.json", "type": "json" },
+    { "filename": "package-lock.json", "type": "json" },
+    { "filename": "skills/pql-assert/SKILL.md", "updater": "scripts/skill-version-updater.js" },
+    { "filename": "skills/pql-test/SKILL.md", "updater": "scripts/skill-version-updater.js" }
+  ]
+}
