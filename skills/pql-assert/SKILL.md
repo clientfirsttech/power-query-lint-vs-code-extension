@@ -5,222 +5,338 @@ description: PQL.Assert DAX unit testing library documentation. Use when writing
 user-invokable: false
 ---
 
-# PQL.Assert - DAX Unit Testing Library
+# PQL.Assert
 
-A comprehensive DAX assertion library for writing unit tests in Power BI and Analysis Services semantic models. PQL.Assert provides standardized assertion functions to validate data, calculations, and model integrity.
+Act as a semantic model test engineer writing DAX unit tests with the PQL.Assert library for Power BI and Analysis Services. PQL.Assert provides standardized assertion functions that validate data, calculations, and model integrity.
 
-## Getting Started
+Current version: **PQL.Assert 0.7.0** ([DAX Lib](https://daxlib.org/package/PQL.Assert/)). Install it from DAX Lib, or load [`functions.tmdl`](references/functions.tmdl) (in this extension's `skills/pql-assert/references/` folder) into the semantic model and refresh.
 
-### Installation
+Competencies {
+  writing atomic DAX assertions for values, columns, tables, relationships, perspectives, partitions, and OLS
+  organizing tests by environment (DEV, TEST, PROD, ANY)
+  discovering and running tests, including RLS / OLS impersonation
+  model health checks with PQL.Assert.BP
+  validating user-defined function names against reserved DAX words
+}
 
-Current version: **PQL.Assert 0.7.0** ([DAX Lib](https://daxlib.org/package/PQL.Assert/)). Install it from DAX Lib, or:
+Constraints {
+  Every standard test function returns the 4-column schema (TestName, Expected, Actual, Passed).
+  Never UNION `PQL.Assert.BP` results with standard `PQL.Assert` results. BP returns 5 columns (adds RuleDescription); mixing them is a runtime error. BP functions may be UNIONed with each other.
+  Keep BP runners in dedicated functions that contain only BP calls, and keep standard runners free of BP calls.
+  Name test functions `[name].[environment].Tests` (`.Test` for a single assertion). Keep `[name]` to 15-20 characters.
+  Keep tests focused and atomic: one thing per assertion, with a descriptive test name.
+  Include "should pass" or "should fail" in a test name when you want automatic validation of expectations.
+  A user-defined function name must not match a reserved DAX word (case-insensitive). See validateFunctionName.
+  When the column ref parameter is a column, pass a column reference (`'Table'[Column]`); when it says tableName / columnName, pass strings.
+  Pass `""` (or omit) for optional parameters you do not want checked.
+}
 
-1. Load the [`functions.tmdl`](references/functions.tmdl) file (located in the extension's `skills/pql-assert/references/` folder) into your semantic model
-2. Refresh the model to make functions available
-3. Start writing tests using PQL.Assert functions
+## Interfaces
 
-### Basic Usage
+TestResult {
+  TestName: String   // description of the test being conducted
+  Expected: Any      // what the test should result in (hardcoded value or Boolean)
+  Actual: Any        // the result under the current dataset
+  Passed: Boolean    // true if expected matches actual
+}
+
+BPResult extends TestResult {
+  RuleDescription: String
+}
+
+Environment {
+  DEV   // static or parameterized data, known baseline; calculation and logic validation
+  TEST  // live data for stakeholder validation; content and schema validation
+  PROD  // live production data; health checks and data drift detection
+  ANY   // applies to all environments
+  // custom environments (UAT, STAGING, ...) are supported: RetrieveTestsByEnvironmentV2("UAT") returns .UAT. and .ANY. tests
+}
+
+TestCategories {
+  // which environments each category belongs in
+  calculations: [DEV]            // measures, calculated columns, edge cases
+  content: [DEV, TEST, PROD]     // row counts, data quality, value validation
+  schema: [DEV, TEST, PROD]      // table/column existence, relationships, data types
+}
+
+DiscoveredTest {
+  Name
+  Description
+  PQLAssert_ImpersonatedUserName // non-blank => run with EffectiveUserName (RLS)
+  PQLAssert_RoleName             // non-blank => run under this role (OLS / RLS)
+}
+
+## Function Catalog
+
+Signatures use `(testName, ...)`. The first argument is always the test name.
+
+Basic {
+  PQL.Assert.ShouldBeTrue(testName, actualCondition)
+  PQL.Assert.ShouldBeFalse(testName, actualCondition)
+  PQL.Assert.ShouldBeNull(testName, actualValue)            // BLANK()
+  PQL.Assert.ShouldNotBeNull(testName, actualValue)
+  PQL.Assert.ShouldBeBlank(testName, actualValue)           // empty string ""
+  PQL.Assert.ShouldNotBeBlank(testName, actualValue)
+  PQL.Assert.ShouldBeNullOrBlank(testName, actualValue)
+  PQL.Assert.ShouldNotBeNullOrBlank(testName, actualValue)
+}
+
+Equality {
+  PQL.Assert.ShouldEqual(testName, expected, actual)
+  PQL.Assert.ShouldNotEqual(testName, notExpected, actual)
+  PQL.Assert.ShouldEqualExactly(testName, expected, actual) // case-sensitive string equality
+}
+
+Numeric {
+  PQL.Assert.ShouldBeGreaterThan(testName, threshold, actual)
+  PQL.Assert.ShouldBeLessThan(testName, threshold, actual)
+  PQL.Assert.ShouldBeGreaterOrEqual(testName, threshold, actual)
+  PQL.Assert.ShouldBeLessOrEqual(testName, threshold, actual)
+  PQL.Assert.ShouldBeBetween(testName, lowerBound, upperBound, actual)
+}
+
+String {
+  PQL.Assert.ShouldStartWith(testName, prefix, actual)
+  PQL.Assert.ShouldEndWith(testName, suffix, actual)
+  PQL.Assert.ShouldContainString(testName, substring, actual)
+  PQL.Assert.ShouldMatch(testName, pattern, actual)
+}
+
+Column.NullAndBlank {
+  PQL.Assert.Col.ShouldBeNull(testName, columnRef)               // all values NULL
+  PQL.Assert.Col.ShouldNotBeNull(testName, columnRef)
+  PQL.Assert.Col.ShouldBeBlank(testName, columnRef)              // all values empty strings
+  PQL.Assert.Col.ShouldNotBeBlank(testName, columnRef)
+  PQL.Assert.Col.ShouldBeNullOrBlank(testName, columnRef)
+  PQL.Assert.Col.ShouldNotBeNullOrBlank(testName, columnRef)
+}
+
+Column.Completeness {
+  PQL.Assert.Col.NullRateShouldBeAtMost(testName, columnRef, maxNullPct)
+  PQL.Assert.Col.BlankRateShouldBeAtMost(testName, columnRef, maxBlankPct)
+  PQL.Assert.Col.NullOrBlankRateShouldBeAtMost(testName, columnRef, maxPct)
+  PQL.Assert.Col.PopulatedRateShouldBeAtLeast(testName, columnRef, minPct) // non-null, non-blank
+}
+
+Column.Uniqueness {
+  PQL.Assert.Col.ShouldBeDistinct(testName, columnRef)
+  PQL.Assert.Col.ShouldNotContainDuplicates(testName, columnRef)  // alias for ShouldBeDistinct
+  PQL.Assert.Col.ShouldBeUniqueWithin(testName, columnRef, partitionByCol)
+  PQL.Assert.Col.ComboShouldBeDistinct(testName, columnRef1, columnRef2) // composite key
+}
+
+Column.RangeAndDistribution {
+  PQL.Assert.Col.ShouldBeInRange(testName, columnRef, minIncl, maxIncl)
+  PQL.Assert.Col.MinShouldBeAtLeast(testName, columnRef, minIncl)
+  PQL.Assert.Col.MaxShouldBeAtMost(testName, columnRef, maxIncl)
+  PQL.Assert.Col.MeanShouldBeInRange(testName, columnRef, minIncl, maxIncl)
+  PQL.Assert.Col.PctileShouldBeInRange(testName, columnRef, pct, minIncl, maxIncl)
+  PQL.Assert.Col.StdDevShouldBeAtMost(testName, columnRef, maxStdDev)
+  PQL.Assert.Col.ShareOfZerosAtMost(testName, columnRef, maxPct)
+  PQL.Assert.Col.ShareOfEvensAtLeast(testName, columnRef, minPct)
+  PQL.Assert.Col.ShareOfOddsAtLeast(testName, columnRef, minPct)
+}
+
+Column.SignAndMonotonicity {
+  PQL.Assert.Col.ShouldBeNonNegative(testName, columnRef)  // >= 0
+  PQL.Assert.Col.ShouldBePositive(testName, columnRef)     // > 0
+  PQL.Assert.Col.ShouldBeNonZero(testName, columnRef)
+  PQL.Assert.Col.ShouldBeMonotonicIncreasing(testName, columnRef, orderedByCol)    // strictly increasing
+  PQL.Assert.Col.ShouldBeMonotonicNonDecreasing(testName, columnRef, orderedByCol)
+  PQL.Assert.Col.ShouldBeMonotonicDecreasing(testName, columnRef, orderedByCol)    // strictly decreasing
+}
+
+Column.CategoricalAndFormat {
+  // model-independent: allowed / banned values name their table and column explicitly
+  PQL.Assert.Col.ValuesShouldBeInSet(testName, columnRef, allowedValuesTable, allowedValuesColumn)
+  PQL.Assert.Col.ValuesShouldNotBeInSet(testName, columnRef, bannedValuesTable, bannedValuesColumn)
+  PQL.Assert.Col.DistinctCountShouldBeAtMost(testName, columnRef, maxDistinct)
+  PQL.Assert.Col.DistinctCountShouldBeAtLeast(testName, columnRef, minDistinct)
+  PQL.Assert.Col.TextShouldHaveNoLeadingOrTrailingSpaces(testName, columnRef)
+  PQL.Assert.Col.TextShouldBeTrimmed(testName, columnRef)  // alias
+  PQL.Assert.Col.TextCaseShouldBeUpper(testName, columnRef)
+  PQL.Assert.Col.TextCaseShouldBeLower(testName, columnRef)
+  PQL.Assert.Col.TextLengthShouldBeInRange(testName, columnRef, minLen, maxLen)
+}
+
+Column.TextPattern {
+  // optional trailing matchCase: "Y" | "YES" | "TRUE" | "1" => case-sensitive; default "" => case-insensitive. Blank values are ignored.
+  PQL.Assert.Col.ShouldStartWith(testName, columnRef, prefix [, matchCase])
+  PQL.Assert.Col.ShouldNotStartWith(testName, columnRef, prefix [, matchCase])
+  PQL.Assert.Col.ShouldEndWith(testName, columnRef, suffix [, matchCase])
+  PQL.Assert.Col.ShouldNotEndWith(testName, columnRef, suffix [, matchCase])
+  PQL.Assert.Col.ShouldContainString(testName, columnRef, substring [, matchCase])
+  PQL.Assert.Col.ShouldNotContainString(testName, columnRef, substring [, matchCase])
+}
+
+Column.SchemaAndExistence {
+  PQL.Assert.Col.ShouldExist(testName, tableName, columnName)
+  PQL.Assert.Col.IsAvailableInMDX(testName, tableName, columnName) // prevents Analyze in Excel problems; returns an extra IsMDXActive column
+}
+
+Table {
+  PQL.Assert.Tbl.ShouldHaveRows(testName, tableRef)
+  PQL.Assert.Tbl.ShouldHaveRowCount(testName, tableRef, expectedRowCount)
+  PQL.Assert.Tbl.ShouldHaveMoreRowsThan(testName, threshold, tableToCheck)
+  PQL.Assert.Tbl.ShouldExist(testName, tableName)
+  PQL.Assert.Tbl.ShouldHaveColumns(testName, tableRef, columnNamesList)                  // comma-separated
+  PQL.Assert.Tbl.ShouldNotHaveExtraColumns(testName, tableRef, allowedColumnNamesList)   // comma-separated
+  PQL.Assert.Tbl.ColumnDataTypeShouldBe(testName, tableRef, columnName, expectedType)
+}
+
+Relationship {
+  PQL.Assert.Relationship.ShouldExist(testName, fromTable, fromColumn, toTable, toColumn
+    [, fromCardinality [, toCardinality [, securityFilteringBehavior]]])
+  // fromCardinality / toCardinality: "One" | "Many"
+  // securityFilteringBehavior: "OneDirection" | "BothDirections"
+}
+
+Perspective {
+  PQL.Assert.Perspective.ShouldExist(testName, perspectiveName)
+  PQL.Assert.Perspective.ShouldContain(testName, perspectiveName, expectedTablesList, expectedColumnsList, expectedMeasuresList)
+  PQL.Assert.Perspective.ShouldMatchSchema(testName, perspectiveName, expectedTablesList, expectedColumnsList, expectedMeasuresList) // exactly these, no extras
+  // lists are comma-separated; pass "" for object types not being checked
+}
+
+Partitions {
+  PQL.Assert.Partitions.ShouldExist(testName, tableName, partitionName)
+  PQL.Assert.Partitions.ShouldBe(testName, tableName, expectedPartitionCount)
+  PQL.Assert.Partitions.ShouldBeAtLeast(testName, tableName, minPartitionCount)
+}
+
+OLS {
+  // Rely on the current role context. Run with Modeling > Security > View as, or via MCP with EffectiveUserName / RoleName.
+  PQL.Assert.OLS.TableShouldBeHidden(testName, tableName)             // metadataPermission: none
+  PQL.Assert.OLS.TableShouldBeVisible(testName, tableName)
+  PQL.Assert.OLS.ColumnShouldBeHidden(testName, tableName, columnName) // columnPermission: none
+  PQL.Assert.OLS.ColumnShouldBeVisible(testName, tableName, columnName)
+}
+
+Discovery {
+  // Use INFO.USERDEFINEDFUNCTIONS and INFO.ANNOTATIONS: NOT compatible with the Power Automate "Execute Dataset Query" action.
+  PQL.Assert.RetrieveTestsV2()                        // all tests with DiscoveredTest columns
+  PQL.Assert.RetrieveTestsByEnvironmentV2(environment) // matches .{ENV}. or .ANY.; case-insensitive; blank returns all
+}
+
+BestPractices {
+  // 5-column BPResult schema. Never UNION with standard assertions. More rules are added continuously.
+  ErrorPrevention {
+    PQL.Assert.BP.ShouldHaveSameDataTypeInRelationships() // avoid int64 -> decimal relationships
+    PQL.Assert.BP.CheckErrorPrevention()                  // runs all
+  }
+  Formatting {
+    PQL.Assert.BP.ShouldProvideFormatStringForMeasures()
+    PQL.Assert.BP.ShouldNotSummarizeNumericColumns()      // SummarizeBy = None
+    PQL.Assert.BP.ShouldMarkRowLabels()                   // IsDefaultLabel; helps Copilot find primary identifiers
+    PQL.Assert.BP.ShouldMarkPrimaryKeys()                 // IsKey on the "One" side of relationships
+    PQL.Assert.BP.ShouldHideFactTableColumns()            // numeric columns used in aggregation measures
+    PQL.Assert.BP.CheckFormatting()
+  }
+  DAXExpressions {
+    PQL.Assert.BP.ShouldUseFullyQualifiedColumnReferences() // Table[Column]
+    PQL.Assert.BP.ShouldUseTreatAsInsteadOfIntersect()
+    PQL.Assert.BP.CheckDAXExpressions()
+  }
+  Maintenance {
+    PQL.Assert.BP.ShouldRemoveUnnecessaryMeasures()       // hidden and unreferenced
+    PQL.Assert.BP.ShouldHaveObjectDescriptions()
+    PQL.Assert.BP.ShouldRemoveUnnecessaryColumns()        // hidden and unreferenced by DAX, relationships, hierarchies, Sort By
+    PQL.Assert.BP.CheckMaintenance()
+  }
+  Performance {
+    PQL.Assert.BP.ShouldAvoidBiDirectionalOnHighCardinalityColumn() // > 1M distinct values
+    PQL.Assert.BP.ShouldRemoveAutoDateTable()
+    PQL.Assert.BP.ShouldAvoidFloatingPointDataTypes()     // avoid Number (Double)
+    PQL.Assert.BP.ShouldSetIsAvailableInMdxFalseOnNonAttributeColumns()
+    PQL.Assert.BP.CheckPerformance()
+  }
+}
+
+## Writing Tests
+
+writeTest(request) => testFunction {
+  1. Pick the category: (calculation logic) => DEV; (content / data quality) => any; (schema) => any
+  2. Name it `[name].[environment].Tests`
+  3. Compose atomic assertions with UNION (standard schema only)
+  4. Add `EVALUATE <name>()` to run it
+  5. validateFunctionName(name)
+}
+
+Calculations in DEV:
 
 ```dax
-// Basic assertion example
-EVALUATE PQL.Assert.ShouldEqual("Test 1: 2+2 should equal 4", 4, 2+2)
+DEFINE
+	FUNCTION BusinessLogic.DEV.Tests = () =>
+	UNION (
+		PQL.Assert.ShouldEqual("Revenue calculation with positive sales", 15000, [Total Revenue]),
+		PQL.Assert.ShouldEqual("Revenue calculation with zero sales", 0, [Total Revenue Zero Case]),
+		PQL.Assert.ShouldBeNull("Revenue calculation with blank sales", [Total Revenue Blank Case])
+	)
+
+EVALUATE BusinessLogic.DEV.Tests()
 ```
 
-## Function Reference
-
-### Basic Assertions
-
-- `PQL.Assert.ShouldBeTrue(testName, actualCondition)` - Asserts condition is TRUE
-- `PQL.Assert.ShouldBeFalse(testName, actualCondition)` - Asserts condition is FALSE
-- `PQL.Assert.ShouldBeNull(testName, actualValue)` - Asserts value is NULL (BLANK())
-- `PQL.Assert.ShouldNotBeNull(testName, actualValue)` - Asserts value is not NULL
-- `PQL.Assert.ShouldBeBlank(testName, actualValue)` - Asserts value is empty string ("")
-- `PQL.Assert.ShouldNotBeBlank(testName, actualValue)` - Asserts value is not empty string
-- `PQL.Assert.ShouldBeNullOrBlank(testName, actualValue)` - Asserts value is NULL or empty string
-- `PQL.Assert.ShouldNotBeNullOrBlank(testName, actualValue)` - Asserts value has content
-
-### Equality Assertions
-
-- `PQL.Assert.ShouldEqual(testName, expected, actual)` - Asserts values are equal
-- `PQL.Assert.ShouldNotEqual(testName, notExpected, actual)` - Asserts values are not equal
-- `PQL.Assert.ShouldEqualExactly(testName, expected, actual)` - Case-sensitive string equality
-
-### Numeric Comparisons
-
-- `PQL.Assert.ShouldBeGreaterThan(testName, threshold, actual)` - Asserts actual > threshold
-- `PQL.Assert.ShouldBeLessThan(testName, threshold, actual)` - Asserts actual < threshold
-- `PQL.Assert.ShouldBeGreaterOrEqual(testName, threshold, actual)` - Asserts actual >= threshold
-- `PQL.Assert.ShouldBeLessOrEqual(testName, threshold, actual)` - Asserts actual <= threshold
-- `PQL.Assert.ShouldBeBetween(testName, lowerBound, upperBound, actual)` - Asserts value within range
-
-### String Assertions
-
-- `PQL.Assert.ShouldStartWith(testName, prefix, actual)` - Asserts string starts with prefix
-- `PQL.Assert.ShouldEndWith(testName, suffix, actual)` - Asserts string ends with suffix
-- `PQL.Assert.ShouldContainString(testName, substring, actual)` - Asserts string contains substring
-- `PQL.Assert.ShouldMatch(testName, pattern, actual)` - Asserts string matches pattern
-
-### Column Assertions
-
-#### Null & Blank Checks
-
-- `PQL.Assert.Col.ShouldBeNull(testName, columnRef)` - Asserts all column values are NULL
-- `PQL.Assert.Col.ShouldNotBeNull(testName, columnRef)` - Asserts column has non-NULL values
-- `PQL.Assert.Col.ShouldBeBlank(testName, columnRef)` - Asserts all column values are empty strings
-- `PQL.Assert.Col.ShouldNotBeBlank(testName, columnRef)` - Asserts column has non-empty values
-- `PQL.Assert.Col.ShouldBeNullOrBlank(testName, columnRef)` - Asserts all values are NULL or empty
-- `PQL.Assert.Col.ShouldNotBeNullOrBlank(testName, columnRef)` - Asserts column has content
-
-#### Presence & Completeness Thresholds
-
-- `PQL.Assert.Col.NullRateShouldBeAtMost(testName, columnRef, maxNullPct)` - Asserts null rate is at most the specified percentage
-- `PQL.Assert.Col.BlankRateShouldBeAtMost(testName, columnRef, maxBlankPct)` - Asserts blank (empty string) rate is at most the specified percentage
-- `PQL.Assert.Col.NullOrBlankRateShouldBeAtMost(testName, columnRef, maxPct)` - Asserts null or blank rate is at most the specified percentage
-- `PQL.Assert.Col.PopulatedRateShouldBeAtLeast(testName, columnRef, minPct)` - Asserts populated (non-null, non-blank) rate is at least the specified percentage
-
-#### Uniqueness & Key-Like Behavior
-
-- `PQL.Assert.Col.ShouldBeDistinct(testName, columnRef)` - Asserts all column values are unique
-- `PQL.Assert.Col.ShouldNotContainDuplicates(testName, columnRef)` - Asserts column contains no duplicate values (alias for ShouldBeDistinct)
-- `PQL.Assert.Col.ShouldBeUniqueWithin(testName, columnRef, partitionByCol)` - Asserts column values are unique within partitions defined by another column
-- `PQL.Assert.Col.ComboShouldBeDistinct(testName, columnRef1, columnRef2)` - Asserts the combination of two columns forms a distinct composite key
-
-#### Range & Distribution Checks
-
-- `PQL.Assert.Col.ShouldBeInRange(testName, columnRef, minIncl, maxIncl)` - Asserts all numeric column values fall within the specified inclusive range
-- `PQL.Assert.Col.MinShouldBeAtLeast(testName, columnRef, minIncl)` - Asserts minimum value in column is at least the specified value
-- `PQL.Assert.Col.MaxShouldBeAtMost(testName, columnRef, maxIncl)` - Asserts maximum value in column is at most the specified value
-- `PQL.Assert.Col.MeanShouldBeInRange(testName, columnRef, minIncl, maxIncl)` - Asserts mean of column falls within the specified range
-- `PQL.Assert.Col.PctileShouldBeInRange(testName, columnRef, pct, minIncl, maxIncl)` - Asserts specified percentile of column falls within the given range
-- `PQL.Assert.Col.StdDevShouldBeAtMost(testName, columnRef, maxStdDev)` - Asserts standard deviation of column is at most the specified value
-- `PQL.Assert.Col.ShareOfZerosAtMost(testName, columnRef, maxPct)` - Asserts share of zero values is at most the specified percentage
-- `PQL.Assert.Col.ShareOfEvensAtLeast(testName, columnRef, minPct)` - Asserts share of even values is at least the specified percentage
-- `PQL.Assert.Col.ShareOfOddsAtLeast(testName, columnRef, minPct)` - Asserts share of odd values is at least the specified percentage
-
-#### Sign & Monotonicity
-
-- `PQL.Assert.Col.ShouldBeNonNegative(testName, columnRef)` - Asserts all values in column are non-negative (>= 0)
-- `PQL.Assert.Col.ShouldBePositive(testName, columnRef)` - Asserts all values in column are strictly positive (> 0)
-- `PQL.Assert.Col.ShouldBeNonZero(testName, columnRef)` - Asserts no values in column are zero
-- `PQL.Assert.Col.ShouldBeMonotonicIncreasing(testName, columnRef, orderedByCol)` - Asserts values monotonically strictly increase when ordered by another column
-- `PQL.Assert.Col.ShouldBeMonotonicNonDecreasing(testName, columnRef, orderedByCol)` - Asserts values monotonically non-decrease when ordered by another column
-- `PQL.Assert.Col.ShouldBeMonotonicDecreasing(testName, columnRef, orderedByCol)` - Asserts values monotonically strictly decrease when ordered by another column
-
-#### Categorical, Membership & Format
-
-- `PQL.Assert.Col.ValuesShouldBeInSet(testName, columnRef, allowedValuesTable, allowedValuesColumn)` - Asserts all column values are in the specified allowed set (model-independent: explicitly specify table and column)
-- `PQL.Assert.Col.ValuesShouldNotBeInSet(testName, columnRef, bannedValuesTable, bannedValuesColumn)` - Asserts no column values are in the specified banned set (model-independent: explicitly specify table and column)
-- `PQL.Assert.Col.DistinctCountShouldBeAtMost(testName, columnRef, maxDistinct)` - Asserts distinct count of values is at most the specified number
-- `PQL.Assert.Col.DistinctCountShouldBeAtLeast(testName, columnRef, minDistinct)` - Asserts distinct count of values is at least the specified number
-- `PQL.Assert.Col.TextShouldHaveNoLeadingOrTrailingSpaces(testName, columnRef)` - Asserts no text values have leading or trailing spaces
-- `PQL.Assert.Col.TextShouldBeTrimmed(testName, columnRef)` - Asserts all text values are trimmed (alias for TextShouldHaveNoLeadingOrTrailingSpaces)
-- `PQL.Assert.Col.TextCaseShouldBeUpper(testName, columnRef)` - Asserts all text values are uppercase
-- `PQL.Assert.Col.TextCaseShouldBeLower(testName, columnRef)` - Asserts all text values are lowercase
-- `PQL.Assert.Col.TextLengthShouldBeInRange(testName, columnRef, minLen, maxLen)` - Asserts text lengths fall within the specified range
-
-#### Text Pattern Checks
-
-All take an optional trailing `matchCase` argument (`"Y"`, `"YES"`, `"TRUE"`, or `"1"` for case-sensitive; default `""` is case-insensitive). Blank values are ignored.
-
-- `PQL.Assert.Col.ShouldStartWith(testName, columnRef, prefix [, matchCase])` - Asserts every non-blank value starts with the prefix
-- `PQL.Assert.Col.ShouldNotStartWith(testName, columnRef, prefix [, matchCase])` - Asserts no non-blank value starts with the prefix
-- `PQL.Assert.Col.ShouldEndWith(testName, columnRef, suffix [, matchCase])` - Asserts every non-blank value ends with the suffix
-- `PQL.Assert.Col.ShouldNotEndWith(testName, columnRef, suffix [, matchCase])` - Asserts no non-blank value ends with the suffix
-- `PQL.Assert.Col.ShouldContainString(testName, columnRef, substring [, matchCase])` - Asserts every non-blank value contains the substring
-- `PQL.Assert.Col.ShouldNotContainString(testName, columnRef, substring [, matchCase])` - Asserts no non-blank value contains the substring
+Content in any environment:
 
 ```dax
-EVALUATE PQL.Assert.Col.ShouldStartWith("SKU should start with 'SKU-'", 'Products'[SKU], "SKU-", "Y")
+DEFINE
+	FUNCTION DataContent.ANY.Tests = () =>
+	UNION (
+		PQL.Assert.Tbl.ShouldHaveRows("Fact table has data", 'Sales'),
+		PQL.Assert.Col.ShouldNotBeNull("Customer ID not null", 'Customers'[CustomerID]),
+		PQL.Assert.Col.ShouldBeDistinct("Customer ID should be unique", 'Customers'[CustomerID]),
+		PQL.Assert.Col.ShouldStartWith("SKU should start with 'SKU-'", 'Products'[SKU], "SKU-", "Y"),
+		PQL.Assert.ShouldBeBetween("Order amount in valid range", 0, 1000000, MAX('Orders'[Amount]))
+	)
+
+EVALUATE DataContent.ANY.Tests()
 ```
 
-#### Schema & Existence
-
-- `PQL.Assert.Col.ShouldExist(testName, tableName, columnName)` - Asserts column exists
-- `PQL.Assert.Col.IsAvailableInMDX(testName, tableName, columnName)` - Asserts column is available for MDX queries (prevents problems for downstream Analyze in Excel users). Takes table and column **names** (strings), not a column reference. Returns an extra `IsMDXActive` column.
-
-### Table Assertions
-
-#### Row Checks
-
-- `PQL.Assert.Tbl.ShouldHaveRows(testName, tableRef)` - Asserts table has at least one row
-- `PQL.Assert.Tbl.ShouldHaveRowCount(testName, tableRef, expectedRowCount)` - Asserts exact row count
-- `PQL.Assert.Tbl.ShouldHaveMoreRowsThan(testName, threshold, tableToCheck)` - Asserts row count > threshold
-
-#### Schema & Column Shape
-
-- `PQL.Assert.Tbl.ShouldExist(testName, tableName)` - Asserts table exists
-- `PQL.Assert.Tbl.ShouldHaveColumns(testName, tableRef, columnNamesList)` - Asserts table has all specified columns (comma-separated list)
-- `PQL.Assert.Tbl.ShouldNotHaveExtraColumns(testName, tableRef, allowedColumnNamesList)` - Asserts table does not have extra columns beyond the allowed list (comma-separated)
-- `PQL.Assert.Tbl.ColumnDataTypeShouldBe(testName, tableRef, columnName, expectedType)` - Asserts column has the expected data type
-
-### Relationship Assertions
-
-- `PQL.Assert.Relationship.ShouldExist(testName, fromTable, fromColumn, toTable, toColumn [, fromCardinality [, toCardinality [, securityFilteringBehavior]]])` - Asserts relationship exists. Optional checks (pass `""` or omit to skip): `fromCardinality`/`toCardinality` = `"One"` or `"Many"`; `securityFilteringBehavior` = `"OneDirection"` or `"BothDirections"`
+Schema in any environment:
 
 ```dax
-EVALUATE PQL.Assert.Relationship.ShouldExist(
-    "Sales-Customer is Many-to-One, single direction",
-    "Sales", "CustomerID", "Customers", "CustomerID",
-    "Many", "One", "OneDirection"
-)
+DEFINE
+	FUNCTION Schema.ANY.Tests = () =>
+	UNION (
+		PQL.Assert.Tbl.ShouldExist("Sales table exists", "Sales"),
+		PQL.Assert.Col.ShouldExist("Customer ID column exists", "Customers", "CustomerID"),
+		PQL.Assert.Relationship.ShouldExist("Sales-Customer is Many-to-One, single direction",
+			"Sales", "CustomerID", "Customers", "CustomerID", "Many", "One", "OneDirection")
+	)
+
+EVALUATE Schema.ANY.Tests()
 ```
 
-### Perspective Assertions
+Measures with filter context (DEV):
 
-- `PQL.Assert.Perspective.ShouldExist(testName, perspectiveName)` - Asserts that a perspective exists in the model
-- `PQL.Assert.Perspective.ShouldContain(testName, perspectiveName, expectedTablesList, expectedColumnsList, expectedMeasuresList)` - Asserts that a perspective contains the specified tables, columns, and measures (provided as comma-separated lists; pass `""` for object types not being checked)
-- `PQL.Assert.Perspective.ShouldMatchSchema(testName, perspectiveName, expectedTablesList, expectedColumnsList, expectedMeasuresList)` - Asserts that a perspective contains exactly the specified tables, columns, and measures and no additional objects
-
-**Example Usage:**
 ```dax
-// Verify perspective exists
-EVALUATE PQL.Assert.Perspective.ShouldExist("Finance perspective exists", "Finance")
+DEFINE
+	FUNCTION Measures.DEV.Tests = () =>
+	VAR __DS0FilterTable = TREATAS({TRUE}, 'TestData'[IsActive])
+	VAR _Test1 =
+		SUMMARIZECOLUMNS(
+			__DS0FilterTable,
+			"CountID", IGNORE(CALCULATE(COUNTA('TestData'[ID])))
+		)
+	RETURN PQL.Assert.ShouldEqual("ShouldBeEqual to 3", 3, _Test1)
 
-// Verify perspective contains expected objects
+EVALUATE Measures.DEV.Tests()
+```
+
+Perspective and partition checks:
+
+```dax
 EVALUATE PQL.Assert.Perspective.ShouldContain(
-    "Finance perspective should contain core objects",
-    "Finance",
-    "Sales,Customers,Products",     // expected tables
-    "Sales[Amount],Sales[OrderDate]", // expected columns
-    "Sales[Total Sales]"              // expected measures
+    "Finance perspective should contain core objects", "Finance",
+    "Sales,Customers,Products",       // tables
+    "Sales[Amount],Sales[OrderDate]", // columns
+    "Sales[Total Sales]"              // measures
 )
-
-// Verify perspective schema matches exactly (no extra objects)
-EVALUATE PQL.Assert.Perspective.ShouldMatchSchema(
-    "Finance perspective schema should match",
-    "Finance",
-    "Sales,Customers",
-    "Customers[CustomerName]",
-    "Sales[Total Sales],Sales[YTD Sales]"
-)
-```
-
-### Partition Assertions
-
-- `PQL.Assert.Partitions.ShouldExist(testName, tableName, partitionName)` - Asserts that a named partition exists on the specified table
-- `PQL.Assert.Partitions.ShouldBe(testName, tableName, expectedPartitionCount)` - Asserts that the table has exactly the expected number of partitions
-- `PQL.Assert.Partitions.ShouldBeAtLeast(testName, tableName, minPartitionCount)` - Asserts that the table has at least the specified number of partitions
-
-**Example Usage:**
-```dax
-EVALUATE PQL.Assert.Partitions.ShouldExist("Sales 2024 partition exists", "Sales", "Sales 2024")
 EVALUATE PQL.Assert.Partitions.ShouldBe("Sales has two partitions", "Sales", 2)
-EVALUATE PQL.Assert.Partitions.ShouldBeAtLeast("Sales has at least one partition", "Sales", 1)
 ```
 
-### Object Level Security (OLS) Assertions
+OLS role (TMDL) and runner:
 
-> **Note:** OLS assertions rely on the current role/security context. Run them with **Modeling → Security → View as** set to the role you want to validate, or via an MCP tool using `EffectiveUserName`/`RoleName`.
-
-- **Table-Level OLS**
-  - `PQL.Assert.OLS.TableShouldBeHidden(testName, tableName)` - Asserts that the table is hidden from metadata (OLS `metadataPermission: none`) in the current context
-  - `PQL.Assert.OLS.TableShouldBeVisible(testName, tableName)` - Asserts that the table is visible in metadata in the current context
-
-- **Column-Level OLS**
-  - `PQL.Assert.OLS.ColumnShouldBeHidden(testName, tableName, columnName)` - Asserts that the column is hidden from metadata (OLS `columnPermission: none`) in the current context
-  - `PQL.Assert.OLS.ColumnShouldBeVisible(testName, tableName, columnName)` - Asserts that the column is visible in metadata in the current context
-
-**Example TMDL role configuration:**
 ```tmdl
 role West
     modelPermission: read
@@ -231,7 +347,6 @@ role West
         columnPermission 'Hidden Column' = none
 ```
 
-**Example OLS test runner:**
 ```dax
 DEFINE
     FUNCTION OLS_West.ANY.Tests = () =>
@@ -244,263 +359,32 @@ DEFINE
 EVALUATE OLS_West.ANY.Tests()
 ```
 
-### Test Discovery
+## Discovering and Running Tests
 
-- `PQL.Assert.RetrieveTestsV2()` - Returns all test functions with full metadata columns (`[Name]`, `[Description]`, `[PQLAssert_ImpersonatedUserName]`, `[PQLAssert_RoleName]`). Uses `INFO.USERDEFINEDFUNCTIONS` and `INFO.ANNOTATIONS`. **Not compatible with Power Automate.**
-- `PQL.Assert.RetrieveTestsByEnvironmentV2(environment)` - Returns tests filtered by environment (e.g., "DEV", "TEST", "PROD") matching `.{ENV}.` or `.ANY.` in function names with full metadata. Case-insensitive. Returns all tests if environment is blank. **Not compatible with Power Automate.**
+discoverAndRun(environment) => results {
+  1. tests = `EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("<environment>")` // blank => all tests; case-insensitive
+  2. for each (test in tests) executeTest(test)
+  3. Report results; keep BP results separate from standard results
+}
 
-> ⚠️ **Power Automate compatibility:** These functions use `INFO.USERDEFINEDFUNCTIONS` and `INFO.ANNOTATIONS`, which are **not supported** in the Power Automate **Execute Dataset Query** action. Use a Power Automate–compatible alternative when calling from Power Automate.
+executeTest(test) {
+  test.PQLAssert_ImpersonatedUserName is non-blank => `EVALUATE <Name>()` with EffectiveUserName = that value (RLS evaluated as that user)
+  test.PQLAssert_RoleName is non-blank => `EVALUATE <Name>()` with RoleName = that value (OLS / RLS rules applied)
+  otherwise => `EVALUATE <Name>()` normally
 
-> **Note:** V2 discovery results include a `[PQLAssert_RoleName]` column. If this value is non-blank, execute the test under that role context so OLS/RLS rules are evaluated correctly.
+  Constraints {
+    In the MCP context, use `dax_query_operations` with EffectiveUserName and/or RoleName according to the tool's capabilities.
+  }
+}
 
-### Best Practice Validations
-
-PQL.Assert includes built-in semantic model validation functions based on Best Practice Analyzer rules. These functions help identify common issues and anti-patterns in your Power BI models.
-
-> **Note:** Additional validation rules are being added continuously. This is an initial set covering the most critical model health checks.
-
-> **Important — Schema Difference:** `PQL.Assert.BP` functions return a **5-column schema** (TestName, Expected, Actual, Passed, **RuleDescription**), which differs from the standard 4-column schema used by all other `PQL.Assert` functions. **Never UNION `PQL.Assert.BP` results with standard `PQL.Assert` results.** Keep BP test runners completely separate from standard test runners. You may UNION BP functions with other BP functions freely, since they all share the same 5-column schema.
-
-#### Error Prevention
-
-- `PQL.Assert.BP.ShouldHaveSameDataTypeInRelationships()` - Validates that relationship columns have matching data types (avoiding int64→decimal relationships)
-- `PQL.Assert.BP.CheckErrorPrevention()` - Runs all error prevention checks
-
-#### Formatting
-
-- `PQL.Assert.BP.ShouldProvideFormatStringForMeasures()` - Validates that visible measures have format strings assigned
-- `PQL.Assert.BP.ShouldNotSummarizeNumericColumns()` - Validates that numeric columns have SummarizeBy set to None
-- `PQL.Assert.BP.ShouldMarkRowLabels()` - Validates that visible tables have at least one column marked as a row label (IsDefaultLabel = true), helping Power BI Copilot identify primary identifiers
-- `PQL.Assert.BP.ShouldMarkPrimaryKeys()` - Validates that columns on the "One" side of relationships have the IsKey property set to true
-- `PQL.Assert.BP.ShouldHideFactTableColumns()` - Validates that numeric columns used in aggregation measures are hidden from end users
-- `PQL.Assert.BP.CheckFormatting()` - Runs all formatting checks
-
-#### DAX Expressions
-
-- `PQL.Assert.BP.ShouldUseFullyQualifiedColumnReferences()` - Validates that column references use Table[Column] format
-- `PQL.Assert.BP.ShouldUseTreatAsInsteadOfIntersect()` - Validates that measures use TREATAS instead of INTERSECT for better performance
-- `PQL.Assert.BP.CheckDAXExpressions()` - Runs all DAX expression checks
-
-#### Maintenance
-
-- `PQL.Assert.BP.ShouldRemoveUnnecessaryMeasures()` - Validates that hidden measures not referenced by any DAX expressions are flagged for removal
-- `PQL.Assert.BP.ShouldHaveObjectDescriptions()` - Validates that visible tables, measures, and columns have descriptions assigned
-- `PQL.Assert.BP.ShouldRemoveUnnecessaryColumns()` - Validates that hidden columns not referenced by any DAX expressions, relationships, hierarchy levels, or Sort By-properties are flagged for removal
-- `PQL.Assert.BP.CheckMaintenance()` - Runs all maintenance checks
-
-#### Performance
-
-- `PQL.Assert.BP.ShouldAvoidBiDirectionalOnHighCardinalityColumn()` - Validates bi-directional relationships on high-cardinality columns (>1M distinct values)
-- `PQL.Assert.BP.ShouldRemoveAutoDateTable()` - Validates that auto-date tables are disabled
-- `PQL.Assert.BP.ShouldAvoidFloatingPointDataTypes()` - Validates that columns avoid Number (Double) data type
-- `PQL.Assert.BP.ShouldSetIsAvailableInMdxFalseOnNonAttributeColumns()` - Validates IsAvailableInMdx setting on non-attribute columns
-- `PQL.Assert.BP.CheckPerformance()` - Runs all performance checks
-
-**Example Usage:**
-```dax
-// Run individual validation
-EVALUATE PQL.Assert.BP.ShouldProvideFormatStringForMeasures()
-
-// Run all checks in a category
-EVALUATE PQL.Assert.BP.CheckFormatting()
-EVALUATE PQL.Assert.BP.CheckPerformance()
-
-// Combine all best practice checks (BP-only UNION is safe — all share the 5-column schema)
-EVALUATE UNION(
-    PQL.Assert.BP.CheckErrorPrevention(),
-    PQL.Assert.BP.CheckFormatting(),
-    PQL.Assert.BP.CheckDAXExpressions(),
-    PQL.Assert.BP.CheckMaintenance(),
-    PQL.Assert.BP.CheckPerformance()
-)
-
-// ❌ WRONG — do NOT mix BP and standard PQL.Assert results in a UNION
-// EVALUATE UNION(
-//     PQL.Assert.BP.CheckFormatting(),          -- 5-column schema
-//     PQL.Assert.ShouldEqual("My test", 1, 1)  -- 4-column schema → runtime error
-// )
-```
-
-## Workspace Governance & Environments
-
-### Environment Types
-
-**DEV (Development)**
-- Static/parameterized data for stable testing
-- Known baseline data state
-- Focus on calculation and logic validation
-
-**TEST**
-- Live data for client/stakeholder validation
-- Pre-production environment
-- Content and schema validation
-
-**PROD (Production)**
-- Live production data
-- Health checks and data drift detection
-- Continuous monitoring
-
-**ANY**
-- Tests that apply across all environments
-- Universal validation rules
-
-### Test Types by Environment
-
-| Test Category | DEV | TEST | PROD | Description |
-|---------------|-----|------|------|-------------|
-| **Testing Calculations** | ✓ | | | Validate measures, calculated columns, edge cases |
-| **Testing Content** | ✓ | ✓ | ✓ | Row counts, data quality, value validation |
-| **Testing Schema** | ✓ | ✓ | ✓ | Table/column existence, relationships, data types |
-
-## Writing and Running Tests
-
-### Standard Schema
-
-All test functions must return results following the DAX Query View Testing Pattern standard schema:
-
-| Column Name | Type | Description |
-|-------------|------|-------------|
-| TestName | String | Description of the test being conducted |
-| Expected | Any | What the test should result in (hardcoded value or Boolean) |
-| Actual | Any | The result of the test under the current dataset |
-| Passed | Boolean | True if expected matches actual, otherwise false |
-
-### Tab Naming Convention
-
-Follow the pattern: `[name].[environment].test(s)`
-
-**Format Guidelines:**
-- `[name]` - Keep to 15-20 characters for tab readability
-- `[environment]` - DEV, TEST, PROD, or ANY
-- Use `.tests` for multiple assertions, `.test` for single assertion
-
-**Examples:**
-- `DataQuality.DEV.Tests` - Data quality tests for development
-- `Schema.ANY.Tests` - Schema validation for all environments
-- `Revenue.PROD.Tests` - Revenue calculation health checks for production
-- `Customers.TEST.Tests` - Customer data validation for testing environment
-
-### Creating Test Functions
-
-#### Testing Calculations (DEV Environment)
-```dax
-DEFINE
-	FUNCTION BusinessLogic.DEV.Tests = () =>
-	UNION (
-		PQL.Assert.ShouldEqual("Revenue calculation with positive sales", 15000, [Total Revenue]),
-		PQL.Assert.ShouldEqual("Revenue calculation with zero sales", 0, [Total Revenue Zero Case]),
-		PQL.Assert.ShouldBeNull("Revenue calculation with blank sales", [Total Revenue Blank Case]),
-		PQL.Assert.ShouldEqual("Basic math validation", 4, 2+2)
-	)
-
-EVALUATE BusinessLogic.DEV.Tests()
-```
-
-#### Testing Content (Any Environment)
-```dax
-DEFINE
-	FUNCTION DataContent.ANY.Tests = () =>
-	UNION (
-		PQL.Assert.Tbl.ShouldHaveRows("Fact table has data", 'Sales'),
-		PQL.Assert.Col.ShouldNotBeNull("Customer ID not null", 'Customers'[CustomerID]),
-		PQL.Assert.ShouldBeGreaterThan("Fact table row count threshold", 1000, COUNTROWS('Sales')),
-		PQL.Assert.Col.ShouldNotBeNull("Order date not null", 'Orders'[OrderDate])
-	)
-
-EVALUATE DataContent.ANY.Tests()
-```
-
-#### Testing Schema (Any Environment)
-```dax
-DEFINE
-	FUNCTION Schema.ANY.Tests = () =>
-	UNION (
-		PQL.Assert.Tbl.ShouldExist("Sales table exists", "Sales"),
-		PQL.Assert.Col.ShouldExist("Customer ID column exists", "Customers", "CustomerID"),
-		PQL.Assert.Relationship.ShouldExist("Sales-Customer relationship", "Sales", "CustomerID", "Customers", "CustomerID")
-	)
-
-EVALUATE Schema.ANY.Tests()
-```
-
-#### Advanced Measure Testing (DEV Environment)
-```dax
-DEFINE 
-
-	FUNCTION Measures.DEV.Tests = () =>
-    VAR __DS0FilterTable = 
-        TREATAS({TRUE}, 'TestData'[IsActive])
-
-    VAR _Test1 =
-        SUMMARIZECOLUMNS(
-            __DS0FilterTable,
-            "CountID", IGNORE(CALCULATE(COUNTA('TestData'[ID])))
-        )
-
-	RETURN PQL.Assert.ShouldEqual("ShouldBeEqual to 3", 3, _Test1)
-
-EVALUATE Measures.DEV.Tests()
-```
-
-### Discovering Tests
-
-Use the test discovery functions to find all available test functions:
-
-```dax
-// Find all test functions with full metadata ([Name], [Description], [PQLAssert_ImpersonatedUserName], [PQLAssert_RoleName])
-EVALUATE PQL.Assert.RetrieveTestsV2()
-
-// Find tests by environment (recommended approach)
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("DEV")   // Returns .DEV. and .ANY. tests with metadata
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("TEST")  // Returns .TEST. and .ANY. tests with metadata
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("PROD")  // Returns .PROD. and .ANY. tests with metadata
-
-// Case-insensitive - these are equivalent
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("dev")
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("Dev")
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("DEV")
-
-// Custom environments are supported
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("UAT")      // Returns .UAT. and .ANY. tests
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("STAGING")  // Returns .STAGING. and .ANY. tests
-
-// Blank returns all tests (same as RetrieveTestsV2)
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("")
-```
-
-#### RLS Test Execution with Impersonation
-
-When `[PQLAssert_ImpersonatedUserName]` is non-blank in the discovery results, the test must be executed with user impersonation so RLS filters are evaluated as the specified user. When `[PQLAssert_RoleName]` is non-blank, execute the test under that role so OLS/RLS rules are applied. In the MCP context, use `dax_query_operations` with `EffectiveUserName` set to the value of `[PQLAssert_ImpersonatedUserName]` and/or `RoleName` set to `[PQLAssert_RoleName]` according to the tool's capabilities.
-
-1. Discover tests: `EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("<environment>")`
-2. For each test where `[PQLAssert_ImpersonatedUserName]` is non-blank, execute `EVALUATE <Name>()` with `EffectiveUserName` = `[PQLAssert_ImpersonatedUserName]`
-3. For each test where `[PQLAssert_RoleName]` is non-blank, execute `EVALUATE <Name>()` with `RoleName` = `[PQLAssert_RoleName]`
-4. For all other tests, execute `EVALUATE <Name>()` normally
-
-### Running All Tests
-
-After discovering tests, you can run them individually or create environment-specific test runners:
-
-> **Important:** Keep `PQL.Assert.BP` runners strictly separate from standard test runners. BP functions return a 5-column schema; standard functions return 4 columns. Mixing them in a single `UNION` causes a runtime error.
+Runners (keep standard and BP in separate functions):
 
 ```dax
 DEFINE
-	// Run all DEV tests (standard 4-column schema only)
-	FUNCTION DEV.AllTests = () =>
-	UNION (
-		BusinessLogic.DEV.Tests(),
-		DataQuality.DEV.Tests()
-	)
-	
-	// Run all production health checks (standard 4-column schema only)
-	FUNCTION PROD.HealthChecks = () =>
-	UNION (
-		DataContent.ANY.Tests(),
-		Schema.ANY.Tests()
-	)
+	FUNCTION DEV.AllTests = () =>          // standard 4-column schema only
+	UNION ( BusinessLogic.DEV.Tests(), DataQuality.DEV.Tests() )
 
-	// Best practice checks — SEPARATE runner (5-column schema; never mix with above)
-	FUNCTION BestPractices.AllChecks = () =>
+	FUNCTION BestPractices.AllChecks = () => // SEPARATE runner: 5-column schema, BP only
 	UNION (
 		PQL.Assert.BP.CheckErrorPrevention(),
 		PQL.Assert.BP.CheckFormatting(),
@@ -510,97 +394,43 @@ DEFINE
 	)
 
 EVALUATE DEV.AllTests()
-EVALUATE PROD.HealthChecks()
-
-// BP checks are evaluated independently — never combined with standard test runners
 EVALUATE BestPractices.AllChecks()
+
+// WRONG: never mix BP (5 columns) with standard (4 columns) in one UNION
+// UNION( PQL.Assert.BP.CheckFormatting(), PQL.Assert.ShouldEqual("My test", 1, 1) )
 ```
 
-### Test Validation
-
-Use the built-in validation layer to check if test expectations match results:
+validateExpectations(results) {
+  Name tests with "should pass" or "should fail", then compare:
+}
 
 ```dax
-// Include "should pass" or "should fail" in test names for automatic validation
 VAR _Results = Example.Tests()
-VAR _Validation = 
+VAR _Validation =
     ADDCOLUMNS(
         _Results,
         "ExpectedToPass", CONTAINSSTRING([TestName], "should pass"),
-        "ValidationStatus", 
+        "ValidationStatus",
         IF(
             CONTAINSSTRING([TestName], "should pass") && [Passed] = TRUE, "✅ CORRECT",
             IF(CONTAINSSTRING([TestName], "should fail") && [Passed] = FALSE, "✅ CORRECT", "❌ MISMATCH")
         )
     )
-
 EVALUATE _Validation
 ```
 
-## Best Practices
+## Function Name Restrictions
 
-### Test Naming
+validateFunctionName(name) => ok | warning | error {
+  Reserved words are listed in [`references/reserved-dax-words.md`](references/reserved-dax-words.md); it is the authoritative list.
+  1. name equals a reserved word (case-insensitive exact match, e.g. `filter`, `sum`, `calculate`) => error
+  2. name contains a reserved word with no delimiter (e.g. `filterData` contains `filter`) => warning
+  3. otherwise => ok
+}
 
-- Use descriptive test names that explain what is being tested
-- Include "should pass" or "should fail" for validation automation
-- Group related tests in functions ending with `.Tests`
-
-### Function Name Restrictions
-
-DAX user-defined function names must not match any reserved DAX word. The complete list of reserved words is maintained in [`references/reserved-dax-words.md`](references/reserved-dax-words.md). Key rules:
-
-- Perform a **case-insensitive** exact match between the function name and each reserved word.
-- Flag the name as an **error** if it exactly matches a reserved word (e.g., naming a function `filter`, `sum`, or `calculate`).
-- Flag the name with a **warning** if it contains a reserved word without a delimiter (e.g., `filterData` contains `filter`).
-- Consult [`references/reserved-dax-words.md`](references/reserved-dax-words.md) for the authoritative list when writing or reviewing function names.
-
-### Test Organization
-
-- Create separate test functions for different areas (data validation, business logic, etc.)
-- Use meaningful function names like `DataQuality.Tests`, `Calculations.Tests`
-- Keep tests focused and atomic - test one thing per assertion
-- **Never UNION `PQL.Assert.BP` results with standard `PQL.Assert` results.** BP functions return a 5-column schema (TestName, Expected, Actual, Passed, RuleDescription); all other functions return 4 columns. Always keep BP test runners in dedicated functions that contain only BP calls, and keep standard test runners free of BP calls.
-
-### Example Test Structure
-
-```dax
-DEFINE
-	// Content validation for any environment
-	FUNCTION DataQuality.ANY.Tests = () =>
-	UNION (
-		// Null checks
-		PQL.Assert.Col.ShouldNotBeNull("Data Quality: Customer ID should not be null", 'Customers'[CustomerID]),
-		PQL.Assert.Col.ShouldNotBeNull("Data Quality: Order date should not be null", 'Orders'[OrderDate]),
-		
-		// Uniqueness checks
-		PQL.Assert.Col.ShouldBeDistinct("Data Quality: Customer ID should be unique", 'Customers'[CustomerID]),
-		
-		// Range checks
-		PQL.Assert.ShouldBeBetween("Data Quality: Order amount in valid range", 0, 1000000, MAX('Orders'[Amount]))
-	)
-	
-	// Calculation validation for development only
-	FUNCTION BusinessLogic.DEV.Tests = () =>
-	UNION (
-		// Calculation validation with static data
-		PQL.Assert.ShouldEqual("Business Logic: Total sales calculation", 15000, [Total Sales]),
-		PQL.Assert.ShouldBeGreaterThan("Business Logic: Growth rate positive", 0, [Growth Rate])
-	)
-	
-	// Schema validation for any environment
-	FUNCTION Schema.ANY.Tests = () =>
-	UNION (
-		PQL.Assert.Tbl.ShouldExist("Schema: Customers table exists", "Customers"),
-		PQL.Assert.Col.ShouldExist("Schema: CustomerID column exists", "Customers", "CustomerID")
-	)
-
-// Run environment-specific test suites
-EVALUATE DataQuality.ANY.Tests()
-EVALUATE BusinessLogic.DEV.Tests()
-
-// Discover all available test functions
-EVALUATE PQL.Assert.RetrieveTestsV2()
-
-// Discover tests by environment with metadata (includes [PQLAssert_ImpersonatedUserName] and [PQLAssert_RoleName] for RLS/OLS)
-EVALUATE PQL.Assert.RetrieveTestsByEnvironmentV2("DEV")
-```
+Commands {
+  ✍️ /pql-assert write - write a test function for a calculation, content, or schema check
+  🔎 /pql-assert discover - list tests for an environment, honoring RLS / OLS metadata
+  🩺 /pql-assert bp - run best practice checks in a separate BP runner
+  🔤 /pql-assert name - validate a function name against reserved DAX words
+}
