@@ -3,7 +3,15 @@ Business Source License 1.1
 Licensor:             Client First Technologies
 Licensed Work:        Power Query Lint VS Code Extension
                       The Licensed Work is (c) 2026 Client First Technologies
-Additional Use Grant: None
+Additional Use Grant: You may make production use of the Licensed Work,
+                      including using it to test, validate, or monitor
+                      Power BI / Microsoft Fabric semantic models in a
+                      production environment, provided that you do not
+                      offer the Licensed Work, or any derivative work of
+                      the Licensed Work, to third parties on a hosted,
+                      managed, or embedded basis as a product or service
+                      that competes with any current or future commercial
+                      offering of the Licensor.
 Change Date:          Four years from the date the Licensed Work is published
 Change License:       GNU Affero General Public License v3.0
 
@@ -90,7 +98,7 @@ Copyright (C) 2026 Client First Technologies
 Use of this software is governed by the Business Source License included in
 the LICENSE file and at www.mariadb.com/bsl11.
 
-Change Date: Four years from the date the Licensed Work is published
+Change Date:          Four years from the date the Licensed Work is published
 
 On the date above, in accordance with the Business Source License, use of this
 software will be governed by the GNU Affero General Public License v3.0 as
