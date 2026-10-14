@@ -21,7 +21,23 @@ Install directly from the [Visual Studio Marketplace](https://marketplace.visual
 code --install-extension ClientFirstTechnologies.power-query-lint
 ```
 
-### Prerequisites
+### Claude Code
+
+The same agents and skills are available in [Claude Code](https://claude.com/claude-code) as the `power-query-lint` plugin. Clone this repository and load it for a session:
+
+```bash
+claude --plugin-dir ./power-query-lint-vs-code-extension
+```
+
+The plugin provides the `pql-linter` and `pql-tester` agents, the `pql-assert`, `pql-test`, and `semantic-model-authoring` skills, and the `powerbi-modeling-mcp` and `pqlint-mcp` MCP servers. Before linting, set your Power Query Lint subscription key in the environment Claude Code runs in:
+
+```powershell
+$env:OCP_APIM_SUBSCRIPTION_KEY = "<your key>"
+```
+
+Requires Node.js (for `npx`) and, for test execution, the `pql-test` CLI (see the `pql-test` skill). You can also install the CLI's own skill with `pql-test skill --install claude`.
+
+### Prerequisites (VS Code)
 
 - Visual Studio Code 1.99.0 or higher
 - [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) extension (required dependency)
@@ -47,7 +63,7 @@ This extension contributes two GitHub Copilot agents:
 
 ### MCP Configuration
 
-MCP tools are defined remotely and configured via the `mcp.json` file in the extension root. No local MCP server setup is required.
+MCP tools are defined remotely and configured via the `mcp.json` file in the extension root. No local MCP server setup is required. In Claude Code, the plugin ships its own MCP configuration.
 
 ## Extension Settings
 

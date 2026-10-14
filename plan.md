@@ -373,11 +373,15 @@ Findings that shape the plan:
 6. Add `claude plugin validate --strict` to CI and to Task 8.
 7. Unverified items to test early in Task 3: whether Copilot's `chatAgents` contribution accepts Claude-format files, whether `version` is tolerated in Copilot frontmatter, and whether the `skills:` key in the tester agent works in Claude (plugin skills are namespaced `<plugin>:<skill>`).
 
-#### 2. Choose and document the source-of-truth layout
+#### 2. Choose and document the source-of-truth layout — DONE 2026-10-14
+
+Implemented: `agent-src/agents.json` + `agent-src/<id>.body.md`, built by `scripts/build-agents.js` (`npm run build:agents`, `npm run check:agents`, run from `vscode:prepublish` and from the `postbump` release hook). Placeholders: `{{skill:…}}`, `{{tool:…}}`, `{{#copilot}}…{{/copilot}}`. The Copilot output is byte-identical to the previous files except for removing two hard-coded `c:/Users/JohnKerski/...` path fallbacks that were shipping in the tester agent.
 
 Recommended: keep `skills/` as canonical for shipped skills (already shared). For agents, keep one shared body per agent and generate the two frontmatter variants with a small script in `scripts/` (`resources/agents/` for Copilot, `agents/` for Claude), run from `npm run compile`/`prepublish` and checked in CI so the two never drift. Alternative to reject unless the spike says otherwise: two hand-maintained copies.
 
-#### 3. Claude Code plugin packaging
+#### 3. Claude Code plugin packaging — DONE 2026-10-14
+
+Implemented: `.claude-plugin/plugin.json` (references `./.claude-plugin/mcp.json`), `.claude-plugin/mcp.json`, generated `agents/pql-linter.md` and `agents/pql-tester.md`, `.vscodeignore` exclusions (verified with `vsce ls`). Findings: (a) a root-level `.mcp.json` is also read as this repo's own project config (approval prompts, missing-env warning), so the plugin MCP file lives in `.claude-plugin/`; (b) verified with Claude Code 2.1.299: `claude plugin validate . --strict` passes, agents load as `power-query-lint:pql-linter` / `power-query-lint:pql-tester`, skills as `power-query-lint:pql-assert` / `pql-test` / `semantic-model-authoring`, both plugin MCP servers connect (the first `npx` cold start exceeded 30 s once), and the plugin tool-name form `mcp__plugin_power-query-lint_<server>__<tool>` is confirmed for `pqlint-mcp`; (c) `powerbi-modeling-mcp` exposes `dax_query_operations` and `model_operations`, matching the generator tokens, but its tools did not surface in a headless `-p` session, so the Claude-side tool names for that server are still to be confirmed interactively (Task 8). The Claude `skills:` list is omitted from the tester agent until verified.
 
 - Add `.claude-plugin/plugin.json` (name `power-query-lint`, version, description, author, license `BUSL-1.1`, repository). No `marketplace.json` for now.
 - Add `.mcp.json` for `powerbi-modeling-mcp` (stdio) and `pqlint-mcp` (HTTP, key from `OCP_APIM_SUBSCRIPTION_KEY`).
@@ -385,7 +389,7 @@ Recommended: keep `skills/` as canonical for shipped skills (already shared). Fo
 - Resolve file references in agent bodies (for example `skills/pql-assert/references/reserved-dax-words.md`) so they work from the plugin root in both tools.
 - Exclude plugin-only files from the `.vsix` in `.vscodeignore` (and keep `THIRD_PARTY_NOTICES.md` shipping in both).
 
-#### 4. Keep the Copilot path working
+#### 4. Keep the Copilot path working — DONE 2026-10-14 (README and CONTRIBUTING updated)
 
 - No behavior change to `chatAgents`/`chatSkills`/`configureMcpSettings`.
 - Keep `README.md` and `CONTRIBUTING.md` accurate: "Install in VS Code" and "Install in Claude Code" sections, including setting the subscription key env var for Claude.
@@ -403,7 +407,9 @@ Kept for reference only. Skip unless scope changes.
 - Add a Claude variant of `.github/agents/aidd.agent.md` (`.claude/agents/aidd.md`) with Claude tool names (`Read, Edit, Grep, Glob, Bash, Task, TodoWrite`) and the same command table.
 - Make the AIDD agent's file-path instructions location-neutral, and fix `aidd-workflow` (it is still labeled "fabric-ci-cd-dataops").
 
-#### 7. Version and release sync
+#### 7. Version and release sync — PARTLY DONE 2026-10-14
+
+Done: `plugin.json`, all four agent files, both skills, `package.json` and the lockfile bump together (verified by `standard-version --dry-run`); `postbump` regenerates agents. Remaining: CI check and `claude plugin validate --strict` in CI (the repo has no CI workflow yet).
 
 - Add `.claude-plugin/plugin.json` to `.versionrc.json` `bumpFiles` so `npm run release` keeps every version in step, including the new Claude manifests.
 - Add a CI check that `package.json`, plugin manifest, skill, and agent versions all match, and run `claude plugin validate . --strict`.
