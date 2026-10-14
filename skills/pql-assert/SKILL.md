@@ -2,7 +2,7 @@
 name: pql-assert
 version: 1.2.1
 description: PQL.Assert DAX unit testing library documentation. Use when writing, understanding, or debugging DAX-based unit tests for Power BI and Analysis Services semantic models. Covers assertion functions for values, columns, tables, relationships, best practices, test discovery, environment governance, and function name validation against reserved DAX words.
-user-invokable: false
+user-invocable: false
 ---
 
 # PQL.Assert
