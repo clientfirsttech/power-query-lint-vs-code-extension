@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, lint, and consistency checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Agent variants are up to date
+        run: npm run check:agents
+
+      - name: Versions match package.json
+        run: npm run check:versions
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev
+
+      - name: Package contents
+        run: npx vsce ls
+
+  claude-plugin:
+    name: Validate Claude Code plugin
+    runs-on: ubuntu-latest
+    # Not blocking until this job has run green in CI at least once.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Claude Code
+        run: npm install --global @anthropic-ai/claude-code
+
+      - name: Validate plugin
+        run: claude plugin validate . --strict

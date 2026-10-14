@@ -407,9 +407,9 @@ Kept for reference only. Skip unless scope changes.
 - Add a Claude variant of `.github/agents/aidd.agent.md` (`.claude/agents/aidd.md`) with Claude tool names (`Read, Edit, Grep, Glob, Bash, Task, TodoWrite`) and the same command table.
 - Make the AIDD agent's file-path instructions location-neutral, and fix `aidd-workflow` (it is still labeled "fabric-ci-cd-dataops").
 
-#### 7. Version and release sync — PARTLY DONE 2026-10-14
+#### 7. Version and release sync — DONE 2026-10-14
 
-Done: `plugin.json`, all four agent files, both skills, `package.json` and the lockfile bump together (verified by `standard-version --dry-run`); `postbump` regenerates agents. Remaining: CI check and `claude plugin validate --strict` in CI (the repo has no CI workflow yet).
+Done: `plugin.json`, all four agent files, both skills, `package.json` and the lockfile bump together (verified by `standard-version --dry-run`); `postbump` regenerates agents. CI: `.github/workflows/ci.yml` runs `check:agents`, `check:versions` (`scripts/check-versions.js`), lint, compile, `npm audit --omit=dev`, and `vsce ls` on every push to `main` and every PR, plus a non-blocking `claude plugin validate . --strict` job. Promote the plugin job to blocking after it has passed once in CI (it has not run in CI yet, and it assumes `claude plugin validate` works unauthenticated, which it did locally).
 
 - Add `.claude-plugin/plugin.json` to `.versionrc.json` `bumpFiles` so `npm run release` keeps every version in step, including the new Claude manifests.
 - Add a CI check that `package.json`, plugin manifest, skill, and agent versions all match, and run `claude plugin validate . --strict`.
