@@ -145,11 +145,11 @@ When creating tests, you MUST:
 **functions.tmdl** (function definition):
 ```dax
 function 'Schema.ANY.Tests' =
-    () =>
-        UNION(
-            PQL.Assert.Tbl.ShouldExist("MarvelFact table exists", "MarvelFact"),
-            PQL.Assert.Tbl.ShouldExist("DateDim table exists", "DateDim")
-        )
+		() =>
+			UNION(
+				PQL.Assert.Tbl.ShouldExist("MarvelFact table exists", "MarvelFact"),
+				PQL.Assert.Tbl.ShouldExist("DateDim table exists", "DateDim")
+			)
 ```
 
 **Schema.ANY.Tests.dax** (function call only):
@@ -198,15 +198,14 @@ code := generateTestCode("schema", ["MarvelFact", "DateDim"], "ANY")
 **Step 2: Create functions.tmdl Entry**
 ```dax
 function 'Schema.ANY.Tests' =
-    () =>
-        UNION(
-            PQL.Assert.Tbl.ShouldExist("MarvelFact table exists", "MarvelFact"),
-            PQL.Assert.Tbl.ShouldExist("DateDim table exists", "DateDim")
-        )
-    lineageTag: 8f3a5b2e-9d4c-4e1a-8b5f-3c2d1e4a6b7c
-    
-    annotation PQLAssert_Environment = ANY
-    annotation PQLAssert_Category = Schema
+		() =>
+			UNION(
+				PQL.Assert.Tbl.ShouldExist("MarvelFact table exists", "MarvelFact"),
+				PQL.Assert.Tbl.ShouldExist("DateDim table exists", "DateDim")
+			)
+
+	annotation PQLAssert_Environment = ANY
+	annotation PQLAssert_Category = Schema
 ```
 
 **Step 3: Create Schema.ANY.Tests.dax File**
@@ -259,6 +258,8 @@ EVALUATE Schema.ANY.Tests()
 - MUST combine multiple assertions with `UNION`
 - Naming format: `[Area].[Environment].Test(s)` (no reserved words)
 - Avoid visuals and Power Query (M)
+- **MUST follow `${CLAUDE_PLUGIN_ROOT}/skills/semantic-model-authoring/references/tmdl-guidelines.md` for ALL TMDL you write or edit (including `functions.tmdl`).** Where an example in this file disagrees with those guidelines, the guidelines win.
+- **TMDL function layout (CRITICAL):** indent with tabs. The function expression (the `() =>` line and the body) sits two tabs in; properties such as `annotation` sit exactly one tab in, so the expression is indented deeper than the properties. Do NOT add `lineageTag` to new functions. If a property line is indented the same as the expression, the parser folds it into the body and the function loads in a SemanticError state (`The syntax for 'lineageTag' is incorrect`).
 - **MUST NOT improvise another way to reach the model.** If the `powerbi-modeling-mcp` connection or `pql-test` fails, STOP, report the error and what was tried, and offer the supported options. NEVER connect to the local Analysis Services instance directly (msmdsrv, localhost ports, ADOMD.NET, TOM, PowerShell, hand-written XMLA, reading Power BI Desktop workspace or port files) and never write ad-hoc connection code. The only supported routes are the `powerbi-modeling-mcp` tools and the `pql-test` CLI (which makes its own XMLA connection).
 - **MUST ask before installing anything.** Creating a virtual environment or running `pip install` requires the user to choose it first.
 
@@ -1147,10 +1148,12 @@ function generateTestCode(testType, targets, env):
   definition := """
 /// {testType} tests for {environment} environment
 function '{functionName}' =
-    () =>
-        UNION(
-            {assertions}
-        )
+		() =>
+			UNION(
+				{assertions}
+			)
+
+	annotation PQLAssert_Environment = {environment}
 """
   
   # Generate simple query call (for .dax file)

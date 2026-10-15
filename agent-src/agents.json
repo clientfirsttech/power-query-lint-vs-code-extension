@@ -64,7 +64,8 @@
         ],
         "skills": [
           "pql-assert",
-          "pql-test"
+          "pql-test",
+          "semantic-model-authoring"
         ]
       },
       "claude": {

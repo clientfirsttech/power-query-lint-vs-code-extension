@@ -28,6 +28,7 @@ Constraints {
   Include "should pass" or "should fail" in a test name when you want automatic validation of expectations.
   Every dot-separated segment of a test function name must not be a reserved DAX word (case-insensitive). `Calculations.DEV.Tests` fails to parse because `Calculations` is reserved; use `Metrics.DEV.Tests`. Check with validateFunctionName BEFORE writing any file.
   A DAX query (a `.dax` file or a DAX Query View tab) contains only DAX. Never put TMDL-only lines in one: `lineageTag`, `annotation ...`, `description`, or `///` doc comments. They belong in `definition/functions.tmdl` only. Pasting them into a query fails with `The syntax for 'lineageTag' is incorrect`.
+  Follow the `semantic-model-authoring` skill (`references/tmdl-guidelines.md`) for any TMDL you write; where this skill's TMDL example differs, those guidelines win.
   When the test function is persisted in the model (`functions.tmdl`), the query tab only calls it: `EVALUATE <Name>()`. Do not also `DEFINE FUNCTION` the same name in the tab.
   When the column ref parameter is a column, pass a column reference (`'Table'[Column]`); when it says tableName / columnName, pass strings.
   Pass `""` (or omit) for optional parameters you do not want checked.
@@ -269,24 +270,23 @@ Syntax {
 }
 
 checkTestFile(text) => cleanText {
-  1. text contains `lineageTag`, `annotation`, or `///` lines => remove them; they belong in functions.tmdl only
+  1. text contains `lineageTag`, `annotation`, or `///` lines => remove them; they belong in functions.tmdl only (and new functions should not have `lineageTag` at all)
   2. text has `DEFINE FUNCTION <Name>` and `<Name>` is already persisted in functions.tmdl => delete the DEFINE block and keep `EVALUATE <Name>()`
   3. validateFunctionName(<Name>)
   4. the call is written without quotes: `EVALUATE Schema.ANY.Tests()`
 }
 
-Persisted function in `definition/functions.tmdl` (TMDL):
+Persisted function in `definition/functions.tmdl` (TMDL). Indent with tabs: the expression (`() =>` and the body) two tabs in, properties like `annotation` exactly one tab in, and no `lineageTag` on new functions. A property indented the same as the expression is folded into the body and the function loads in a SemanticError state:
 
 ```tmdl
 function 'Schema.ANY.Tests' =
-    () =>
-        UNION(
-            PQL.Assert.Tbl.ShouldExist("Sales table exists", "Sales")
-        )
-    lineageTag: 8f3a5b2e-9d4c-4e1a-8b5f-3c2d1e4a6b7c
+		() =>
+			UNION(
+				PQL.Assert.Tbl.ShouldExist("Sales table exists", "Sales")
+			)
 
-    annotation PQLAssert_Environment = ANY
-    annotation PQLAssert_Category = Schema
+	annotation PQLAssert_Environment = ANY
+	annotation PQLAssert_Category = Schema
 ```
 
 The matching query tab (DAX), containing only the call:

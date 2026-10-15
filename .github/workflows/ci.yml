@@ -31,6 +31,9 @@ jobs:
       - name: Example test names avoid reserved DAX words
         run: npm run check:names
 
+      - name: TMDL function examples are indented correctly
+        run: npm run check:tmdl
+
       - name: Lint
         run: npm run lint
 

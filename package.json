@@ -100,6 +100,7 @@
     "check:agents": "node scripts/build-agents.js --check",
     "check:versions": "node scripts/check-versions.js",
     "check:names": "node scripts/check-test-names.js",
+    "check:tmdl": "node scripts/check-tmdl-examples.js",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
