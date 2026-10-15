@@ -48,7 +48,7 @@ Connection {
 
 TestFile {
   location: "*.SemanticModel/DAXQueries/"
-  name: "<Suite>.<ENV>.Tests.dax" // e.g. Calculations.DEV.Tests.dax
+  name: "<Suite>.<ENV>.Tests.dax" // e.g. Metrics.DEV.Tests.dax
   envSegment: any value, matched exactly and case-insensitively by --env; ANY suites always match
   schema: 4 columns (TestName, Expected, Actual, Passed); BP suites have 5 (adds RuleDescription)
 }

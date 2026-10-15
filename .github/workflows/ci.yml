@@ -28,6 +28,9 @@ jobs:
       - name: Versions match package.json
         run: npm run check:versions
 
+      - name: Example test names avoid reserved DAX words
+        run: npm run check:names
+
       - name: Lint
         run: npm run lint
 

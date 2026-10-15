@@ -26,7 +26,9 @@ Constraints {
   Name test functions `[name].[environment].Tests` (`.Test` for a single assertion). Keep `[name]` to 15-20 characters.
   Keep tests focused and atomic: one thing per assertion, with a descriptive test name.
   Include "should pass" or "should fail" in a test name when you want automatic validation of expectations.
-  A user-defined function name must not match a reserved DAX word (case-insensitive). See validateFunctionName.
+  Every dot-separated segment of a test function name must not be a reserved DAX word (case-insensitive). `Calculations.DEV.Tests` fails to parse because `Calculations` is reserved; use `Metrics.DEV.Tests`. Check with validateFunctionName BEFORE writing any file.
+  A DAX query (a `.dax` file or a DAX Query View tab) contains only DAX. Never put TMDL-only lines in one: `lineageTag`, `annotation ...`, `description`, or `///` doc comments. They belong in `definition/functions.tmdl` only. Pasting them into a query fails with `The syntax for 'lineageTag' is incorrect`.
+  When the test function is persisted in the model (`functions.tmdl`), the query tab only calls it: `EVALUATE <Name>()`. Do not also `DEFINE FUNCTION` the same name in the tab.
   When the column ref parameter is a column, pass a column reference (`'Table'[Column]`); when it says tableName / columnName, pass strings.
   Pass `""` (or omit) for optional parameters you do not want checked.
 }
@@ -254,17 +256,59 @@ BestPractices {
   }
 }
 
+## Where Test Code Lives
+
+TestForm {
+  inline: a DAX Query View tab with `DEFINE FUNCTION <Name> = () => ...` followed by `EVALUATE <Name>()`. Pure DAX. Good for trying an idea. Not discoverable by RetrieveTests* or live pql-test discovery, because the function is not in the model.
+  persisted: the function is defined in the model, in `definition/functions.tmdl` using TMDL syntax. A query tab only calls it with `EVALUATE <Name>()`. This is what RetrieveTestsV2 and live pql-test discovery find; `*.Tests.dax` files are an offline fallback.
+}
+
+Syntax {
+  TMDL only (valid in functions.tmdl, invalid in a DAX query): `function 'Name' =` header, `lineageTag`, `annotation ...` (for example `annotation PQLAssert_Environment = ANY`), `description`, `///` doc comments
+  DAX only (valid in a query, invalid in functions.tmdl): `DEFINE FUNCTION`, `EVALUATE`
+}
+
+checkTestFile(text) => cleanText {
+  1. text contains `lineageTag`, `annotation`, or `///` lines => remove them; they belong in functions.tmdl only
+  2. text has `DEFINE FUNCTION <Name>` and `<Name>` is already persisted in functions.tmdl => delete the DEFINE block and keep `EVALUATE <Name>()`
+  3. validateFunctionName(<Name>)
+  4. the call is written without quotes: `EVALUATE Schema.ANY.Tests()`
+}
+
+Persisted function in `definition/functions.tmdl` (TMDL):
+
+```tmdl
+function 'Schema.ANY.Tests' =
+    () =>
+        UNION(
+            PQL.Assert.Tbl.ShouldExist("Sales table exists", "Sales")
+        )
+    lineageTag: 8f3a5b2e-9d4c-4e1a-8b5f-3c2d1e4a6b7c
+
+    annotation PQLAssert_Environment = ANY
+    annotation PQLAssert_Category = Schema
+```
+
+The matching query tab (DAX), containing only the call:
+
+```dax
+EVALUATE Schema.ANY.Tests()
+```
+
 ## Writing Tests
 
 writeTest(request) => testFunction {
   1. Pick the category: (calculation logic) => DEV; (content / data quality) => any; (schema) => any
-  2. Name it `[name].[environment].Tests`
+  1b. Choose the TestForm: persisted (recommended, discoverable) or inline (quick experiment)
+  2. Name it `[name].[environment].Tests`, then validateFunctionName(name) before writing anything
   3. Compose atomic assertions with UNION (standard schema only)
-  4. Add `EVALUATE <name>()` to run it
-  5. validateFunctionName(name)
+  4. Persisted => put the function in functions.tmdl (TMDL) and a tab with only `EVALUATE <name>()`; inline => `DEFINE FUNCTION` plus `EVALUATE <name>()` in one tab, with no TMDL lines
+  5. checkTestFile(text) on every query text you produce
 }
 
-Calculations in DEV:
+The examples below use the inline form (pure DAX, ready to paste into a DAX Query View tab).
+
+Calculation logic in DEV:
 
 ```dax
 DEFINE
@@ -427,9 +471,15 @@ EVALUATE _Validation
 
 validateFunctionName(name) => ok | warning | error {
   Reserved words are listed in [`references/reserved-dax-words.md`](references/reserved-dax-words.md); it is the authoritative list.
-  1. name equals a reserved word (case-insensitive exact match, e.g. `filter`, `sum`, `calculate`) => error
-  2. name contains a reserved word with no delimiter (e.g. `filterData` contains `filter`) => warning
-  3. otherwise => ok
+  1. split name on "." and check EVERY segment, including the area (first) segment
+  2. any segment equals a reserved word (case-insensitive exact match, e.g. `Calculations` in `Calculations.DEV.Tests`, or `filter`, `sum`, `calculate`) => error naming the segment, with a suggested replacement (e.g. `Metrics` for `Calculations`)
+  3. a segment contains a reserved word with no delimiter (e.g. `filterData` contains `filter`) => warning
+  4. otherwise => ok
+
+  Constraints {
+    An error stops the workflow: do not write the function or the query file until the name is changed.
+    Run this on every name you generate, including names copied from examples.
+  }
 }
 
 Commands {

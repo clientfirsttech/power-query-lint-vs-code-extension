@@ -361,7 +361,7 @@ DEFINE FUNCTION Content.DEV.DataModel.Tests() = ...
 - **Suffix**: Test or Tests
 
 Examples:
-- `Calculations.DEV.Tests()`
+- `Metrics.DEV.Tests()`
 - `Content.PROD.Test()`
 - `Schema.ANY.Relationships.Tests()`
 
