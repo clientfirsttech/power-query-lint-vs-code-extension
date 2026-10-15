@@ -1,0 +1,14 @@
+{
+  "name": "power-query-lint-extension",
+  "description": "Local marketplace used by the Power Query Lint VS Code extension to provide its agents and skills to Claude Code.",
+  "owner": {
+    "name": "Client First Technologies"
+  },
+  "plugins": [
+    {
+      "name": "power-query-lint",
+      "source": "./",
+      "description": "Power Query lint, PQL.Assert semantic model testing, and pql-test execution skills and agents."
+    }
+  ]
+}

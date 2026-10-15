@@ -7,6 +7,15 @@ examples/**
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/.eslintrc.json
+eslint.config.js
 **/*.map
 **/*.ts
 node_modules/**
+.github/**
+plan.md
+vision.md
+CONTRIBUTING.md
+package-lock.json
+scripts/**
+.versionrc.json
+agent-src/**

@@ -5,7 +5,7 @@ description: pql-test PyPI analyzer wrapper for this project. Covers CLI interfa
 
 # pql-test Analyzer
 
-Runs DAX/PQL tests defined inside a `.pbip` SemanticModel artifact using the `pql-test` PyPI package (v0.1.13+).
+Runs DAX/PQL tests defined inside a `.pbip` SemanticModel artifact using the `pql-test` PyPI package (v0.1.19+).
 All execution flows through `scripts/invoke_pql_test.py`, which wraps the CLI and writes the shared JSON envelope.
 
 ## Installation

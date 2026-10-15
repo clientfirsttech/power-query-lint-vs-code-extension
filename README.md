@@ -21,7 +21,30 @@ Install directly from the [Visual Studio Marketplace](https://marketplace.visual
 code --install-extension ClientFirstTechnologies.power-query-lint
 ```
 
-### Prerequisites
+### Claude Code
+
+The same agents and skills are available in [Claude Code](https://claude.com/claude-code) as the `power-query-lint` plugin. It is opt-in: when this extension detects Claude Code it asks once whether to enable it, and you can choose **Enable**, **Not now**, or **Don't ask again**. Nothing in your Claude Code settings changes unless you choose Enable.
+
+You can also run **Power Query: Enable for Claude Code** or **Power Query: Remove from Claude Code** from the Command Palette at any time, or turn the one-time prompt off with the `powerQueryLint.claudeCode.promptOnStartup` setting. After you enable it, the extension keeps the plugin pointed at the installed extension version when the extension updates. Start a new Claude Code session to pick up changes.
+
+If Claude Code's command line isn't found, the extension shows the two commands to run yourself:
+
+```bash
+claude plugin marketplace add "<extension folder>" --scope user
+claude plugin install power-query-lint@power-query-lint-extension --scope user
+```
+
+To try the plugin from a clone of this repository for a single session instead, run `claude --plugin-dir .` from the repository root.
+
+The plugin provides the `pql-linter` and `pql-tester` agents, the `pql-assert`, `pql-test`, and `semantic-model-authoring` skills, and the `powerbi-modeling-mcp` and `pqlint-mcp` MCP servers. Before linting, set your Power Query Lint subscription key in the environment Claude Code runs in:
+
+```powershell
+$env:OCP_APIM_SUBSCRIPTION_KEY = "<your key>"
+```
+
+Requires Node.js (for `npx`) and, for test execution, the `pql-test` CLI (see the `pql-test` skill). You can also install the CLI's own skill with `pql-test skill --install claude`.
+
+### Prerequisites (VS Code)
 
 - Visual Studio Code 1.99.0 or higher
 - [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) extension (required dependency)
@@ -47,7 +70,7 @@ This extension contributes two GitHub Copilot agents:
 
 ### MCP Configuration
 
-MCP tools are defined remotely and configured via the `mcp.json` file in the extension root. No local MCP server setup is required.
+MCP tools are defined remotely and configured via the `mcp.json` file in the extension root. No local MCP server setup is required. In Claude Code, the plugin ships its own MCP configuration.
 
 ## Extension Settings
 
@@ -63,7 +86,9 @@ For information about development, building, testing, and publishing this extens
 
 ## License
 
-Released under the [Business Source License 1.1](LICENSE). Non-production use is permitted. The license converts to [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html) four years from the date each version is published.
+Released under the [Business Source License 1.1](LICENSE). Non-production use is permitted, and the Additional Use Grant allows production use to test, validate, or monitor Power BI / Microsoft Fabric semantic models, provided the work is not offered to third parties as a competing hosted, managed, or embedded product or service. The license converts to [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html) four years from the date each version is published.
+
+Portions of this extension are derived from third-party works under their own licenses (for example, the `semantic-model-authoring` skill from [microsoft/skills-for-fabric](https://github.com/microsoft/skills-for-fabric), MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Links
 

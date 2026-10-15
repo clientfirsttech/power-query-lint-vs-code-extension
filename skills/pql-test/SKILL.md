@@ -1,256 +1,150 @@
 ---
 name: pql-test
-description: pql-test CLI tool for running PQL.Assert DAX tests against Power BI semantic models. Use when executing tests locally or in CI/CD pipelines, discovering tests by environment, or integrating test results with automation workflows.
+version: 1.2.1
+description: pql-test CLI tool for running PQL.Assert DAX tests against Power BI semantic models. Use when executing tests locally or in CI/CD pipelines, discovering tests by environment, measuring test coverage, or integrating test results with automation workflows.
 ---
 
-# pql-test — Semantic Model Test Execution CLI
+# pql-test
 
-CLI for discovering and running DAX tests in Power BI PBIP semantic models via XMLA.
+Act as a semantic model test engineer driving the `pql-test` CLI to discover and run PQL.Assert DAX tests in Power BI PBIP semantic models over XMLA. Windows, Python ≥ 3.9. Latest at time of writing: `0.1.19` ([PyPI](https://pypi.org/project/pql-test/)).
 
-| Package | Version | Python | License |
-|---------|---------|--------|---------|
-| `pql-test` | 0.1.13 | ≥3.9 | BUSL-1.1 |
-
-## Steps
-
-1. **Check availability** — run `pql-test --version`. If not found, create a venv and install via the venv's own pip (see Installation).
-2. **Check auth** — if the user's request mentions "workspace", run `pql-test auth status`. If unauthenticated, run `pql-test auth login` before proceeding.
-3. **Resolve model path** — if an explicit path is in the prompt, use it. If "workspace" is mentioned, extract the workspace name and model name from the prompt and build `<workspace>.Workspace/<model>.SemanticModel`. Only scan the local filesystem when no workspace is implied.
-4. **Run the command** — use `pql-test run-tests "<modelPath>" [--env ENV]` for execution or `pql-test retrieve-tests "<modelPath>"` for discovery. Always quote the model path.
-
----
-
-## Installation
-
-```bash
-# Create venv and install — always use the venv's own pip, never python -m pip
-python -m venv .venv
-
-# Windows (PowerShell)
-.venv\Scripts\Activate.ps1
-
-# macOS/Linux
-source .venv/bin/activate
-
-pip install pql-test
-pql-test --version
-```
-
-**Dependencies** (auto-installed): `pyadomd`, `msal`, `azure-identity`, `keyring`, `click`, `python-dotenv`, `psutil`
-
----
-
-## CLI Reference
-
-### `pql-test run-tests`
-
-Run DAX tests against a PBIP semantic model.
-
-```bash
-pql-test run-tests <modelPath> [OPTIONS]
-```
-
-#### Options
-
-| Flag | Env Variable | Description |
-|------|--------------|-------------|
-| `--env <ENV>` | — | Filter by environment: `DEV`, `STG`, `PRD`, `ANY` |
-| `--output <file>` | — | Save JSON results to file |
-| `--log-format <fmt>` | — | Output format: `default`, `azuredevops`, `github` |
-| `--tenant-id <GUID>` | `PQL_TENANT_ID` | Azure AD tenant ID |
-| `--workspace-id <GUID>` | `PQL_WORKSPACE_ID` | Power BI workspace GUID |
-| `--dataset-id <GUID>` | `PQL_DATASET_ID` | Dataset/semantic model GUID |
-| `--client-id <ID>` | `PQL_CLIENT_ID` | Service principal client ID |
-| `--client-secret <SECRET>` | `PQL_CLIENT_SECRET` | Service principal secret |
-
-#### Model Path Formats
-
-| Format | Mode | Description |
-|--------|------|-------------|
-| `<workspace>.Workspace/<model>.SemanticModel` | **Service** | Canonical Fabric service path — connect to a remote workspace by display names |
-| `local/<model_name>` | Local | Connect to a locally-open Power BI Desktop instance by model name |
-| `<filesystem_path>` | File / local | Traditional PBIP root directory (default) |
-
-> **Quoting:** if the workspace or model name contains spaces or other shell metacharacters (e.g. parentheses), wrap the entire `MODEL_PATH` argument in double quotes so the shell passes it as one argument:
-> ```bash
-> pql-test run-tests "My Workspace.Workspace/Sales (2024).SemanticModel" --env DEV
-> ```
-
-### `pql-test auth login`
-
-Authenticate with Power BI service for interactive sessions.
-
-```bash
-pql-test auth login --environment <cloud>
-```
-
-**Cloud options:** `Public` (default), `Germany`, `China`, `USGov`, `USGovHigh`, `USGovDoD`
-
-### `pql-test retrieve-tests`
-
-Discover test functions from a model without executing them.
-
-```bash
-pql-test retrieve-tests ./Model.SemanticModel
-```
-
----
-
-## Environment-Scoped Test Execution
-
-Tests following the naming convention `<Suite>.<ENV>.Tests` are filtered by environment:
-
-```bash
-# Run DEV tests (includes .DEV. and .ANY. tests)
-pql-test run-tests ./Model.SemanticModel --env DEV
-
-# Run staging tests
-pql-test run-tests ./Model.SemanticModel --env STG
-
-# Run production health checks
-pql-test run-tests ./Model.SemanticModel --env PRD
-
-# Run all tests (no filter)
-pql-test run-tests ./Model.SemanticModel
-```
-
-### Test File Conventions
-
-- **Location:** `*.SemanticModel/DAXQueries/`
-- **Naming:** `<Suite>.<ENV>.Tests.dax` (e.g., `Calculations.DEV.Tests.dax`)
-- **Environment segments:** `DEV`, `STG`, `PRD`, `ANY`
-
----
-
-## JSON Output Schema
-
-```json
-{
-  "model_path": "/examples/SampleModel.SemanticModel",
-  "passed": 5,
-  "failed": 1,
-  "skipped": 0,
-  "total": 6,
-  "results": [
-    {
-      "test_name": "Revenue calculation",
-      "passed": false,
-      "message": "Expected: 5 | Actual: 7"
-    }
-  ]
+Competencies {
+  discovering and running PQL.Assert test suites by environment
+  resolving model paths (file, local Desktop, Fabric workspace)
+  authenticating to Power BI / Fabric
+  reading JSON results, exit codes, and pipeline annotations
+  measuring test coverage
 }
-```
 
-### Exit Codes
+Constraints {
+  The CLI is the source of truth for its own usage. Run `pql-test --help` or `pql-test <command> --help` for flags, and `pql-test skill --show` for the maintained assistant skill.
+  Always quote the model path.
+  Ask the user before creating a virtual environment or running pip. Never install without their choice.
+  Always install into a virtual environment using the venv's own pip. Never use the system Python.
+  Look for pql-test in the project `.venv` (`.venv/Scripts/pql-test.exe` or `.venv/bin/pql-test`) before concluding it is missing; the venv is usually not activated.
+  If a connection or install fails, stop and report. Never connect to the local Analysis Services instance directly (msmdsrv, localhost ports, ADOMD.NET, TOM, PowerShell, hand-written XMLA). The only supported routes are the `pql-test` CLI and the powerbi-modeling-mcp tools.
+  Only scan the local filesystem for a model when no workspace is implied by the request.
+  Never UNION `PQL.Assert.BP` (5 columns) with standard tests (4 columns). Keep BP suites in their own file. See /pql-assert.
+  Never print or log secrets. Prefer `PQL_*` environment variables or stored credentials over `--client-secret`.
+}
 
-| Code | Meaning |
-|------|---------|
-| `0` | All tests passed (or no tests discovered) |
-| `1` | Tests failed, error occurred, or all tests skipped |
+## Interfaces
 
----
+ModelPath {
+  workspaceService: "<workspace>.Workspace/<model>.SemanticModel" // Fabric service, by display names
+  localDesktop: "local/<model_name>"                              // open Power BI Desktop instance
+  filesystem: "<path>"                                            // PBIP root or .SemanticModel folder
+}
 
-## CI/CD Integration
+Connection {
+  // resolution order: CLI flags > PQL_* environment variables (.env is loaded) > stored credentials (OS keyring)
+  tenantId: PQL_TENANT_ID
+  workspaceId: PQL_WORKSPACE_ID
+  datasetId: PQL_DATASET_ID
+  clientId: PQL_CLIENT_ID
+  clientSecret: PQL_CLIENT_SECRET
+  environment: PQL_ENVIRONMENT // Public (default) | Germany | China | USGov | USGovHigh | USGovDoD
+}
 
-import references/cicd-examples.md
+TestFile {
+  location: "*.SemanticModel/DAXQueries/"
+  name: "<Suite>.<ENV>.Tests.dax" // e.g. Metrics.DEV.Tests.dax
+  envSegment: any value, matched exactly and case-insensitively by --env; ANY suites always match
+  schema: 4 columns (TestName, Expected, Actual, Passed); BP suites have 5 (adds RuleDescription)
+}
 
----
+ExitCodes {
+  run-tests: 0 = all passed or none discovered; 1 = failures, missing prerequisite, or all skipped
+  code-coverage: 0 = success; 1 = no connection or below --min-coverage; 2 = usage error
+}
 
-## Authentication
+## Run a Test Request
 
-### Connection Priority
+runTests(request) => results | stop {
+  1. ensureInstalled()
+  2. request mentions "workspace" => ensureAuthenticated()
+  3. modelPath = resolveModelPath(request)
+  4. Choose the command:
+     (run tests) => `pql-test run-tests "<modelPath>" [--env ENV] [--test NAME] [--output results.json]`
+     (find or list tests) => `pql-test retrieve-tests "<modelPath>" [--env ENV]`
+     (inspect one suite) => `pql-test retrieve-test "<modelPath>" <name> --verbose`
+     (test coverage) => `pql-test code-coverage "<modelPath>" [--min-coverage PCT]`
+  5. Report passed / failed / skipped and each failure's Expected vs Actual
 
-| Priority | Method |
-|----------|--------|
-| 1 | **Local Power BI Desktop** — auto-detected via process inspection |
-| 2 | **Remote Premium/Fabric** — provide all 5 connection flags |
+  Constraints {
+    Use `--log-format azuredevops|github` in pipelines for native annotations.
+    Use `--output <file>` to write JSON: { passed, failed, skipped, total, results[] }.
+  }
+}
 
-### Service Principal Setup
+ensureInstalled() {
+  1. `pql-test --version` (PATH) or the project `.venv` copy succeeds => `pql-test check-prereqs`; done
+  2. Otherwise ask the user to choose: (a) create `.venv` and install (recommended), (b) they install it themselves (show the commands), or (c) skip pql-test
+  3. (a) => create the venv (`python`, then `py`, then `python3` -m venv) and install with the venv's own pip, then use the `.venv` copy directly (no activation needed):
+  4. no Python 3.9+ found => stop and tell the user to install it; do not install any other way
+  5. `.venv` not in .gitignore => offer to add `.venv/`
+}
 
 ```powershell
-# Option 1: Environment variables
-$env:PQL_TENANT_ID = "your-tenant-id"
-$env:PQL_WORKSPACE_ID = "your-workspace-id"
-$env:PQL_DATASET_ID = "your-dataset-id"
-$env:PQL_CLIENT_ID = "your-client-id"
-$env:PQL_CLIENT_SECRET = "your-client-secret"
-
-pql-test run-tests ./Model.SemanticModel --env PRD
-
-# Option 2: CLI flags
-pql-test run-tests ./Model.SemanticModel `
-  --tenant-id $TenantId `
-  --workspace-id $WorkspaceId `
-  --dataset-id $DatasetId `
-  --client-id $ClientId `
-  --client-secret $ClientSecret `
-  --env PRD
+python -m venv .venv
+.venv\Scripts\Activate.ps1   # macOS/Linux: source .venv/bin/activate
+pip install pql-test         # pin in CI: pip install pql-test==<version>
+pql-test --version
+pql-test check-prereqs
 ```
 
-### Interactive Login
+ADOMD.NET is downloaded on first use (disable with `PQL_TEST_NO_AUTO_INSTALL_ADOMD=1`).
 
-```bash
-# Login to Power BI service
-pql-test auth login
+ensureAuthenticated() {
+  1. `pql-test auth status`
+  2. unauthenticated => `pql-test auth login` // interactive browser; also service principal (secret or certificate) or `--identity` for managed identity; `--environment <cloud>` for sovereign clouds
+  3. `pql-test auth logout` clears stored credentials
+}
 
-# Login to specific cloud
-pql-test auth login --environment USGov
-```
+resolveModelPath(request) => ModelPath {
+  explicit path in request => use it
+  request mentions "workspace" => build "<workspace>.Workspace/<model>.SemanticModel" from the names in the request
+  otherwise => scan the local filesystem for *.SemanticModel
+  path contains spaces or parentheses => wrap the whole argument in double quotes
+}
 
----
+## Assistant Skill Files
 
-## Best Practices
+installSkill(harness) {
+  `pql-test skill --list`                // available skills and harnesses
+  `pql-test skill --show`                // print skill content
+  `pql-test skill --install <harness>`   // claude | copilot | cursor | windsurf, or --all
+  `--dry-run` previews; locally customized files are preserved unless `--force`
+}
 
-### Virtual Environment
+## RLS and OLS
 
-1. **Always use virtual environments** — Isolates dependencies from system Python
-2. **Pin versions in CI** — Use `pip install pql-test==0.1.13` for reproducibility
-3. **Include in `.gitignore`** — Add `.venv/` to ignore the virtual environment folder
-
-### Test Organization
-
-1. **Separate runners by schema type** — Never UNION `PQL.Assert.BP` (5-column) with standard tests (4-column)
-2. **Use environment prefixes** — `Schema.ANY.Tests`, `DataQuality.DEV.Tests`, `Metrics.PRD.Tests`
-3. **Keep test functions focused** — One logical group per function
-
-### CI/CD Guidelines
-
-1. **Run DEV tests on every PR** — Catches calculation logic errors early
-2. **Run PRD tests post-deployment** — Validates production data health
-3. **Store results as artifacts** — Enable historical comparison
-4. **Use `--log-format`** — Get native annotations in GitHub/Azure DevOps
-
----
+Constraints {
+  (OLS test) => use `ImpersonateRole:` (recommended)
+  (RLS test) => `ImpersonateUser:` is for service connections only and requires workspace Admin
+}
 
 ## Troubleshooting
 
-### "Model not found" Error
+diagnose(symptom) => fix {
+  (model not found, local) => the model must be open in Power BI Desktop
+  (model not found, remote) => verify the connection parameters; run `pql-test auth login`
+  (tests not discovered) => confirm PQL.Assert is installed in the model, suite names follow `<Suite>.<ENV>.Tests`, and compatibility level >= 1702
+  (connection failed) => service principal needs workspace access; XMLA endpoint must be reachable
+}
 
-- **Local model**: Ensure Power BI Desktop has the model open
-- **XMLA endpoint**: Verify all 5 connection parameters are provided
-- **Authentication**: Run `pql-test auth login` for interactive sessions
+## CI/CD
 
-### Tests Not Discovered
-
-- Verify PQL.Assert functions are installed in the model
-- Check function naming follows `<Suite>.<ENV>.Tests` pattern
-- Confirm model compatibility level ≥ 1702
-
-### Connection Failed
-
-- **Local**: Power BI Desktop must be running with the model open
-- **Remote**: Verify service principal has workspace access
-- **Firewall**: Ensure XMLA endpoint is reachable
-
----
+See [references/cicd-examples.md](references/cicd-examples.md) for GitHub Actions and Azure DevOps pipelines.
 
 ## Related Skills
 
-- **pql-assert** — PQL.Assert DAX assertion library reference
-- **dax-query-guidelines** — DAX query language best practices
+- /pql-assert — PQL.Assert DAX assertion library reference
+- /semantic-model-authoring — semantic model authoring and DAX query guidelines (`references/dax-guidelines.md`)
 
-## Links
-
-- [PyPI Package](https://pypi.org/project/pql-test/)
-- [GitHub Repository](https://github.com/clientfirsttech/PQL.Assert)
-- [Documentation](https://github.com/clientfirsttech/PQL.Assert#readme)
+Commands {
+  🧪 /pql-test run - run suites against a model, optionally scoped by --env
+  🔎 /pql-test discover - list test suites without executing them
+  📊 /pql-test coverage - report which model objects have direct test evidence
+  🔑 /pql-test auth - check or establish authentication
+}

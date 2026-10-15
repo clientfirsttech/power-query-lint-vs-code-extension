@@ -175,6 +175,15 @@ Ensure these files exist before publishing:
 | `LICENSE` | License file |
 | `images/icon.jpg` | Extension icon (128x128 recommended) |
 
+## Agents (Copilot and Claude Code)
+
+The PQL agents have one shared source in `agent-src/` (`agents.json` for per-tool frontmatter and tool-name tokens, plus one `<id>.body.md` per agent). Do not edit the generated files directly:
+
+- `resources/agents/*.md` — GitHub Copilot variants (contributed via `chatAgents`)
+- `agents/*.md` — Claude Code variants (loaded by the `power-query-lint` plugin in `.claude-plugin/`)
+
+After changing anything in `agent-src/`, run `npm run build:agents`. `npm run check:agents` fails if the generated files are out of date, and `vsce package` regenerates them automatically. Test the Claude side with `claude plugin validate . --strict` and `claude --plugin-dir .`.
+
 ## Questions or Issues?
 
 If you have questions or run into issues, please open an issue in the repository.

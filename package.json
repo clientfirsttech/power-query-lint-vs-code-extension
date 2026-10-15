@@ -2,7 +2,7 @@
   "name": "power-query-lint",
   "displayName": "Power Query Lint",
   "description": "Visual Studio Code Extension for Power Query Lint with MCP server support",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "publisher": "ClientFirstTechnologies",
   "icon": "images/icon.jpg",
   "engines": {
@@ -40,7 +40,7 @@
         "path": "skills/pql-assert/SKILL.md"
       },
       {
-        "path": "skills/dax-query-guidelines/SKILL.md"
+        "path": "skills/semantic-model-authoring/SKILL.md"
       },
       {
         "path": "skills/pql-test/SKILL.md"
@@ -54,6 +54,14 @@
       {
         "command": "powerquery-lint.lintWorkspace",
         "title": "Power Query: Lint Workspace"
+      },
+      {
+        "command": "powerquery-lint.enableClaudeCode",
+        "title": "Power Query: Enable for Claude Code"
+      },
+      {
+        "command": "powerquery-lint.disableClaudeCode",
+        "title": "Power Query: Remove from Claude Code"
       }
     ],
     "languages": [
@@ -77,16 +85,26 @@
           "type": "boolean",
           "default": true,
           "description": "Enable/disable Power Query linting"
+        },
+        "powerQueryLint.claudeCode.promptOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Offer once to provide Power Query Lint agents and skills to Claude Code when Claude Code is detected."
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build:agents && npm run compile",
+    "build:agents": "node scripts/build-agents.js",
+    "check:agents": "node scripts/build-agents.js --check",
+    "check:versions": "node scripts/check-versions.js",
+    "check:names": "node scripts/check-test-names.js",
+    "check:tmdl": "node scripts/check-tmdl-examples.js",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src",
     "package": "vsce package",
     "release": "standard-version",
     "release:minor": "standard-version --release-as minor",
@@ -94,11 +112,12 @@
     "release:patch": "standard-version --release-as patch"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.99.0",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
-    "@vscode/vsce": "^2.22.0",
+    "@vscode/vsce": "^3.9.2",
     "eslint": "^10.0.1",
     "standard-version": "^9.5.0",
     "typescript": "^5.3.3"
