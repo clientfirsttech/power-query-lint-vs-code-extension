@@ -179,9 +179,11 @@ Table {
   PQL.Assert.Tbl.ShouldHaveRowCount(testName, tableRef, expectedRowCount)
   PQL.Assert.Tbl.ShouldHaveMoreRowsThan(testName, threshold, tableToCheck)
   PQL.Assert.Tbl.ShouldExist(testName, tableName)
-  PQL.Assert.Tbl.ShouldHaveColumns(testName, tableRef, columnNamesList)                  // comma-separated
-  PQL.Assert.Tbl.ShouldNotHaveExtraColumns(testName, tableRef, allowedColumnNamesList)   // comma-separated
-  PQL.Assert.Tbl.ColumnDataTypeShouldBe(testName, tableRef, columnName, expectedType)
+  // The next three take the table as a STRING name, e.g. "Sales" (not 'Sales' or a table expression).
+  // The library parameter is still called tableRef in 0.7.0; it was renamed tableName in 0.7.1.
+  PQL.Assert.Tbl.ShouldHaveColumns(testName, tableName, columnNamesList)                  // comma-separated
+  PQL.Assert.Tbl.ShouldNotHaveExtraColumns(testName, tableName, allowedColumnNamesList)   // comma-separated
+  PQL.Assert.Tbl.ColumnDataTypeShouldBe(testName, tableName, columnName, expectedType)
 }
 
 Relationship {
@@ -299,6 +301,8 @@ DEFINE
 	FUNCTION Schema.ANY.Tests = () =>
 	UNION (
 		PQL.Assert.Tbl.ShouldExist("Sales table exists", "Sales"),
+		PQL.Assert.Tbl.ShouldHaveColumns("Sales has key columns", "Sales", "OrderID,Amount"),
+		PQL.Assert.Tbl.ColumnDataTypeShouldBe("OrderID is integer", "Sales", "OrderID", "Integer"),
 		PQL.Assert.Col.ShouldExist("Customer ID column exists", "Customers", "CustomerID"),
 		PQL.Assert.Relationship.ShouldExist("Sales-Customer is Many-to-One, single direction",
 			"Sales", "CustomerID", "Customers", "CustomerID", "Many", "One", "OneDirection")
