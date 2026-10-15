@@ -259,6 +259,8 @@ EVALUATE Schema.ANY.Tests()
 - MUST combine multiple assertions with `UNION`
 - Naming format: `[Area].[Environment].Test(s)` (no reserved words)
 - Avoid visuals and Power Query (M)
+- **MUST NOT improvise another way to reach the model.** If the `powerbi-modeling-mcp` connection or `pql-test` fails, STOP, report the error and what was tried, and offer the supported options. NEVER connect to the local Analysis Services instance directly (msmdsrv, localhost ports, ADOMD.NET, TOM, PowerShell, hand-written XMLA, reading Power BI Desktop workspace or port files) and never write ad-hoc connection code. The only supported routes are the `powerbi-modeling-mcp` tools and the `pql-test` CLI (which makes its own XMLA connection).
+- **MUST ask before installing anything.** Creating a virtual environment or running `pip install` requires the user to choose it first.
 
 ---
 
@@ -810,7 +812,14 @@ function ensureModelConnection():
     })
     
     if not hasActiveModelConnection():
-      halt "Failed to connect to Power BI model. Test execution requires active connection."
+      halt """
+      Failed to connect to Power BI model. Test execution requires an active connection.
+
+      I will not try to reach Analysis Services another way. Supported options:
+      1. Retry: the MCP server can time out on its first start (npx download). Reload the plugin or restart the session, then ask again.
+      2. Use the pql-test CLI against the open model: pql-test run-tests "local/<model name>" (ask me to set it up).
+      3. Confirm the model is open in Power BI Desktop and you can query it.
+      """
 
 function refreshModelConnection():
   # TMDL function definitions require Power BI Desktop to reload the project
@@ -916,7 +925,12 @@ function generateAlternatives(reservedWord):
 function findPqlTestCommand():
   # Find a working pql-test invocation.
   # Returns the command prefix (e.g., "pql-test" or "python -m pql_test.cli") or null.
+  # A project venv is usually not activated, so probe it explicitly before PATH
   candidates := [
+    ".venv/Scripts/pql-test.exe",
+    ".venv/bin/pql-test",
+    ".venv/Scripts/python.exe -m pql_test.cli",
+    ".venv/bin/python -m pql_test.cli",
     "pql-test",
     "python -m pql_test.cli",
     "python3 -m pql_test.cli",
@@ -938,17 +952,44 @@ function isPqlTestAvailable():
   # Check whether pql-test is installed and on PATH or via python module
   return findPqlTestCommand() is not null
 
+# Set when the user chose to skip installing pql-test, so callers fall back to MCP instead of halting
+declinedPqlTestInstall := false
+
 function ensurePqlTestInstalled():
   if isPqlTestAvailable():
     return true
 
-  # Attempt automatic venv creation and install — never use system-level pip
-  notify("⚠️ pql-test not found. Creating a virtual environment (.venv) and installing pql-test...")
+  choice := ask("""
+  pql-test was not found. How do you want to proceed?
+  1. Create a virtual environment (.venv in the workspace root) and install pql-test into it (recommended)
+  2. I will install it myself - show me the commands
+  3. Skip pql-test and run a single test through the MCP server instead
+  """)
 
-  setupResult := run_command("python -m venv .venv")
-  if setupResult.exitCode != 0:
-    notify("❌ Failed to create virtual environment: " + setupResult.stderr)
+  if choice is 2:
+    halt pqlTestNotFoundMessage()
+  if choice is 3:
+    declinedPqlTestInstall := true
     return false
+
+  # Choice 1: create a venv and install - never use system-level pip
+  notify("Creating a virtual environment (.venv) and installing pql-test...")
+
+  setupResult := null
+  for each launcher in ["python", "py", "python3"]:
+    try:
+      setupResult := run_command(launcher + " -m venv .venv")
+      if setupResult.exitCode == 0:
+        break
+    catch:
+      continue
+
+  if setupResult is null or setupResult.exitCode != 0:
+    halt """
+    Could not create a virtual environment: Python 3.9 or later was not found (or venv failed).
+    Install Python (for example: winget install Python.Python.3.12), reopen the terminal, and ask again.
+    I will not install pql-test any other way.
+    """
 
   # Use the venv's own pip so pql-test (and its console script) land inside the venv
   pipCmd := ".venv/Scripts/pip"
@@ -957,343 +998,18 @@ function ensurePqlTestInstalled():
 
   installResult := run_command(pipCmd + " install pql-test")
   if installResult.exitCode != 0:
-    notify("❌ pip install pql-test failed: " + installResult.stderr)
-    return false
+    halt "pip install pql-test failed: " + installResult.stderr
 
-  notify("✅ pql-test installed into .venv. To use in future sessions, activate first:\n  .venv\\Scripts\\Activate.ps1   (PowerShell)\n  source .venv/bin/activate      (macOS/Linux)")
+  notify("pql-test installed into .venv. It is found automatically there; no activation needed for this agent. For your own terminal: .venv\\Scripts\\Activate.ps1 (PowerShell) or source .venv/bin/activate (macOS/Linux).")
 
-  # Re-probe so the rest of the flow picks up the venv command prefix
+  # .venv should not be committed - offer, do not edit silently
+  if ".venv" is not in .gitignore:
+    if ask("Add .venv/ to .gitignore? (recommended)") is yes:
+      append ".venv/" to .gitignore
+
+  # Re-probe: findPqlTestCommand now also looks inside .venv
   return isPqlTestAvailable()
 
-function installPQLAssert():
-  # Read the bundled PQL.Assert library
-  pqlAssertPath := "${CLAUDE_PLUGIN_ROOT}/skills/pql-assert/references/functions.tmdl"
-  
-  pqlAssertContent := read(pqlAssertPath)
-  targetFile := "[Model].SemanticModel/definition/functions.tmdl"
-  
-  if exists(targetFile):
-    # Merge with existing functions
-    existingContent := read(targetFile)
-    mergedContent := existingContent + "\n\n" + pqlAssertContent
-    write(targetFile, mergedContent)
-  else:
-    # Create new file with PQL.Assert
-    write(targetFile, pqlAssertContent)
-  
-  message := """
-  ✅ PQL.Assert Library Installation Complete
-  
-  To finalize:
-  1. Save all changes in your workspace
-  2. **Close and reopen the .pbip file in Power BI Desktop**
-     - This is required for TMDL function definitions to load
-     - Cannot be automated - manual reload required
-  3. After reopening, verify functions are available:
-     - Run: EVALUATE PQL.Assert.RetrieveTestsV2()
-  
-  All test .dax files are now ready to execute using PQL.Assert functions.
-  
-  Note: TMDL function changes require a full .pbip reload, not just metadata refresh.
-  For complete function reference, see: ${CLAUDE_PLUGIN_ROOT}/skills/pql-assert/SKILL.md
-  """
-  notify(message)
-  
-  # Instruct user about reload requirement
-  refreshModelConnection()
-  
-  return true
-
-function expandEnvironmentVariables(path):
-  # Expands environment variables like %TEMP%, %USERPROFILE%, etc.
-  # In PowerShell context: resolves to actual user-specific paths
-  # Example: %TEMP% -> C:\Users\<CurrentUser>\AppData\Local\Temp
-  return [System.Environment]::ExpandEnvironmentVariables(path)
-
-function executeAndRetrieveTests(testFunctionName):
-  # Step 1: Execute the DAX query
-  notify("▶️ Executing " + testFunctionName + "...")
-
-  response := call_tool("mcp__plugin_power-query-lint_powerbi-modeling-mcp__dax_query_operations", {
-    operation: "Execute",
-    query: "EVALUATE " + testFunctionName + "()",
-    maxRows: 1000
-  })
-  
-  # Step 2: Verify execution success
-  if not response.success:
-    halt "Query execution failed: " + response.message
-  
-  # Step 3: Access results directory
-  # Expand environment variable to get actual path
-  resultsDir := expandEnvironmentVariables(POWERBI_MCP_RESULTS_DIR)
-  
-  if not exists(resultsDir):
-    halt """
-    ⚠️ RESULTS DIRECTORY NOT FOUND
-    
-    Expected location: """ + resultsDir + """
-    
-    Possible causes:
-    1. MCP server hasn't executed any queries yet
-    2. Temp directory was cleaned
-    3. MCP server is using a different location
-    
-    Try executing a simple test query to initialize the directory.
-    """
-  
-  # Step 4: List all CSV result files
-  allFiles := list_dir(resultsDir)
-  csvFiles := filter(allFiles, (f) => startsWith(f.name, "dax_query_result_") && endsWith(f.name, ".csv"))
-  
-  # Step 5: Get the most recent file (by filename timestamp)
-  if csvFiles.length == 0:
-    halt "No result files found after execution"
-  
-  sortedFiles := sortDescending(csvFiles, by: "name")  # Sort by timestamp in filename
-  latestFile := resultsDir + "\\" + sortedFiles[0].name
-  
-  # Step 6: Read the CSV content
-  notify("📊 Parsing test results...")
-  csvContent := read_file(latestFile, startLine: 1, endLine: 1000)
-  
-  # Step 7: Parse and format results
-  results := parseCsvToTable(csvContent)
-  formattedOutput := formatTestResults(results)
-  
-  notify("✅ Test execution complete!")
-  
-  return formattedOutput
-
-function parseCsvToTable(csvContent):
-  lines := split(csvContent, "\n")
-  
-  if lines.length < 2:
-    halt "CSV file is empty or invalid"
-  
-  # Skip header row (assume first row is: TestName,Expected,Actual,Passed)
-  rows := []
-  
-  for i from 1 to lines.length - 1:
-    line := trim(lines[i])
-    if line != "":
-      row := parseCsvRow(line)
-      if row.length >= 4:
-        rows.append({
-          TestName: row[0],
-          Expected: row[1],
-          Actual: row[2],
-          Passed: row[3]
-        })
-  
-  return rows
-
-function parseCsvRow(line):
-  # Handle CSV with quoted fields containing commas
-  fields := []
-  currentField := ""
-  inQuotes := false
-  
-  for char in line:
-    if char == '"':
-      inQuotes := not inQuotes
-    else if char == ',' && not inQuotes:
-      fields.append(trim(currentField))
-      currentField := ""
-    else:
-      currentField += char
-  
-  fields.append(trim(currentField))  # Add last field
-  
-  return fields
-
-function formatTestResults(rows):
-  if rows.length == 0:
-    return "No test results found."
-  
-  passCount := 0
-  failCount := 0
-  
-  output := "## Test Results - " + rows.length + " tests\n\n"
-  output += "| TestName | Expected | Actual | Passed |\n"
-  output += "|----------|----------|--------|--------|\n"
-  
-  for row in rows:
-    # Format passed column with emoji
-    passedDisplay := if (row.Passed == "True" || row.Passed == "TRUE" || row.Passed == "true") 
-                     then "✅ True" 
-                     else "❌ False"
-    
-    if row.Passed == "True" || row.Passed == "TRUE" || row.Passed == "true":
-      passCount++
-    else:
-      failCount++
-    
-    output += "| " + row.TestName + " | " + row.Expected + " | " + row.Actual + " | " + passedDisplay + " |\n"
-  
-  # Add summary
-  output += "\n---\n\n"
-  output += "**Summary:** " + passCount + " passed ✅"
-  
-  if failCount > 0:
-    output += " | " + failCount + " failed ❌"
-  
-  output += "\n"
-  
-  return output
-
-function executeTestsDirectly(functionName):
-  # CRITICAL: Verify active connection to Power BI model
-  if not hasActiveModelConnection():
-    halt """
-    ⚠️ NO ACTIVE MODEL CONNECTION
-    
-    Test execution requires an active connection to the Power BI semantic model.
-    
-    To connect:
-    1. Use powerbi-modeling-mcp tools to connect to your model
-    2. Ensure the model is open in Power BI Desktop or Visual Studio
-    3. Verify connection status before executing tests
-    
-    You cannot execute DAX queries against the file system - you need a live model connection.
-    """
-  
-  # Check if function is registered (requires .pbip reload after TMDL changes)
-  try:
-    # Try to query function metadata to see if it's loaded
-    query := "EVALUATE TOPN(1, INFO.USERDEFINEDFUNCTIONS())"
-    result := call_tool("mcp__plugin_power-query-lint_powerbi-modeling-mcp__dax_query_operations", {
-      operation: "Execute",
-      query: query
-    })
-  catch:
-    halt """
-    ⚠️ FUNCTIONS NOT LOADED
-    
-    The test functions exist in the TMDL files but are not loaded in the running model.
-    
-    TMDL function definitions require Power BI Desktop to reload the project:
-    1. Save any unsaved changes (Ctrl+S)
-    2. Close the file (File → Close)
-    3. Reopen the .pbip file
-    
-    After reopening, the functions will be available for execution.
-    """
-  
-  # Execute test and retrieve results automatically
-  return executeAndRetrieveTests(functionName)
-
-function resolveModelPath(userProvidedPath, userRequest):
-  if userProvidedPath is not null and userProvidedPath != "":
-    return userProvidedPath
-
-  if isWorkspaceRequest(userRequest):
-    # Build canonical Fabric service path from workspace + model names in the request
-    workspaceName := extractWorkspaceName(userRequest)
-    modelName := extractModelName(userRequest)
-    if workspaceName is null:
-      halt "Could not determine workspace name from your request. Please specify it explicitly, e.g. \"MyWorkspace.Workspace/Model.SemanticModel\"."
-    if modelName is null:
-      halt "Could not determine model name from your request. Please specify it explicitly, e.g. \"" + workspaceName + ".Workspace/Model.SemanticModel\"."
-    return workspaceName + ".Workspace/" + modelName + ".SemanticModel"
-
-  # Local fallback only when no workspace is implied
-  modelFolder := locate("*.SemanticModel")
-  if modelFolder is null or modelFolder == "":
-    halt "Cannot find a *.SemanticModel folder. Provide a model path or open a PBIP project."
-  return modelFolder
-
-function isWorkspaceRequest(userRequest):
-  # Remote Fabric path when the user's message mentions "workspace"
-  return containsIgnoreCase(userRequest, "workspace")
-
-function extractWorkspaceName(userRequest):
-  # Match "<name> workspace" or "<name>.Workspace" (case-insensitive)
-  match := regex_search(userRequest, "([\\w][\\w\\s\\-]*?)\\s*\\.?[Ww]orkspace", ignoreCase: true)
-  if match is not null:
-    return trim(match.group(1))
-  return null
-
-function extractModelName(userRequest):
-  # Extract bare model name (no path, no extension) — e.g. "TestingModel" from "TestingModel.SemanticModel" or context
-  match := regex_search(userRequest, "([\\w][\\w\\-]*)(?:\\.SemanticModel)?", ignoreCase: true)
-  if match is not null:
-    name := trim(match.group(1))
-    # Skip environment words and common verbs that aren't model names
-    skipWords := ["DEV", "STG", "PRD", "ANY", "TEST", "run", "the", "all", "same", "tests", "model", "workspace", "against", "in"]
-    if not containsIgnoreCase(skipWords, name):
-      return name
-  return null
-
-function extractModelPath(userRequest):
-  # Extract an explicit quoted or unquoted model path from the user's message.
-  # Matches: "some path.SemanticModel", some/path.SemanticModel, local/ModelName
-  quoted := regex_search(userRequest, "\"([^\"]+\\.SemanticModel[^\"]*|local/[^\"]+)\"")
-  if quoted is not null:
-    return trim(quoted.group(1))
-  unquoted := regex_search(userRequest, "([\\w.()\\-/\\\\]+\\.SemanticModel\\S*|local/\\S+)")
-  if unquoted is not null:
-    return trim(unquoted.group(1))
-  return null
-
-function ensurePqlTestAuth(commandPrefix):
-  # Check authentication status; prompt login if not authenticated
-  statusResult := run_command(commandPrefix + " auth status")
-  if statusResult.exitCode == 0:
-    return true
-
-  notify("🔐 pql-test is not authenticated. Running auth login...")
-  loginResult := run_command(commandPrefix + " auth login")
-  if loginResult.exitCode != 0:
-    halt "pql-test auth login failed. Please authenticate manually:\n  " + commandPrefix + " auth login"
-  return true
-
-function runPqlTestDiscovery(modelPath, commandPrefix):
-  cmd := commandPrefix + " retrieve-tests \"" + modelPath + "\""
-  notify("🔍 Discovering tests via pql-test...")
-  result := run_command(cmd)
-  if result.exitCode != 0:
-    halt "pql-test retrieve-tests failed: " + result.stderr
-  return result.stdout
-
-function runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix):
-  cmd := commandPrefix + " run-tests \"" + modelPath + "\""
-  if environment is not null and environment != "":
-    cmd += " --env " + environment
-  if outputFile is not null and outputFile != "":
-    cmd += " --output " + outputFile
-  if logFormat is not null and logFormat != "":
-    cmd += " --log-format " + logFormat
-
-  notify("▶️ Running tests via pql-test...")
-  result := run_command(cmd)
-  if result.exitCode != 0:
-    halt "pql-test run-tests failed: " + result.stderr
-  return result.stdout
-
-function pqlTestNotFoundMessage():
-  return """
-  ⚠️ pql-test NOT FOUND
-
-  The `pql-test` CLI is required for bulk test discovery and execution.
-
-  To install:
-  1. Create a virtual environment (recommended):
-     python -m venv .venv
-  2. Activate it:
-     .venv\Scripts\Activate.ps1   (Windows PowerShell)
-     .venv\Scripts\activate.bat   (Windows cmd)
-     source .venv/bin/activate     (macOS/Linux)
-  3. Install pql-test:
-     pip install pql-test
-  4. Verify:
-     pql-test --version
-
-  If `pql-test` is already installed but not on PATH, you can also run:
-      python -m pql_test.cli --version
-
-  For detailed CLI reference, consult the `pql-test` skill.
-  """
 
 function runAllTests(environment, outputFile, logFormat, forceMcp, userModelPath, userRequest):
   commandPrefix := findPqlTestCommand()
@@ -1314,7 +1030,7 @@ function runAllTests(environment, outputFile, logFormat, forceMcp, userModelPath
       modelPath := resolveModelPath(userModelPath, userRequest)
       return runPqlTestExecution(modelPath, environment, outputFile, logFormat, commandPrefix)
 
-  if not forceMcp:
+  if not forceMcp and not declinedPqlTestInstall:
     halt pqlTestNotFoundMessage()
 
   # Fallback: MCP direct execution
@@ -1386,7 +1102,7 @@ function discoverAllTests(forceMcp, userModelPath, userRequest):
       modelPath := resolveModelPath(userModelPath, userRequest)
       return runPqlTestDiscovery(modelPath, commandPrefix)
 
-  if not forceMcp:
+  if not forceMcp and not declinedPqlTestInstall:
     halt pqlTestNotFoundMessage()
 
   # Fallback: MCP direct discovery

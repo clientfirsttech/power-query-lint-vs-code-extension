@@ -19,7 +19,10 @@ Competencies {
 Constraints {
   The CLI is the source of truth for its own usage. Run `pql-test --help` or `pql-test <command> --help` for flags, and `pql-test skill --show` for the maintained assistant skill.
   Always quote the model path.
+  Ask the user before creating a virtual environment or running pip. Never install without their choice.
   Always install into a virtual environment using the venv's own pip. Never use the system Python.
+  Look for pql-test in the project `.venv` (`.venv/Scripts/pql-test.exe` or `.venv/bin/pql-test`) before concluding it is missing; the venv is usually not activated.
+  If a connection or install fails, stop and report. Never connect to the local Analysis Services instance directly (msmdsrv, localhost ports, ADOMD.NET, TOM, PowerShell, hand-written XMLA). The only supported routes are the `pql-test` CLI and the powerbi-modeling-mcp tools.
   Only scan the local filesystem for a model when no workspace is implied by the request.
   Never UNION `PQL.Assert.BP` (5 columns) with standard tests (4 columns). Keep BP suites in their own file. See /pql-assert.
   Never print or log secrets. Prefer `PQL_*` environment variables or stored credentials over `--client-secret`.
@@ -75,8 +78,11 @@ runTests(request) => results | stop {
 }
 
 ensureInstalled() {
-  1. `pql-test --version` succeeds => `pql-test check-prereqs`; done
-  2. Otherwise create a venv and install with its own pip:
+  1. `pql-test --version` (PATH) or the project `.venv` copy succeeds => `pql-test check-prereqs`; done
+  2. Otherwise ask the user to choose: (a) create `.venv` and install (recommended), (b) they install it themselves (show the commands), or (c) skip pql-test
+  3. (a) => create the venv (`python`, then `py`, then `python3` -m venv) and install with the venv's own pip, then use the `.venv` copy directly (no activation needed):
+  4. no Python 3.9+ found => stop and tell the user to install it; do not install any other way
+  5. `.venv` not in .gitignore => offer to add `.venv/`
 }
 
 ```powershell
