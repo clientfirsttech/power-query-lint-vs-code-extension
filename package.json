@@ -54,6 +54,14 @@
       {
         "command": "powerquery-lint.lintWorkspace",
         "title": "Power Query: Lint Workspace"
+      },
+      {
+        "command": "powerquery-lint.enableClaudeCode",
+        "title": "Power Query: Enable for Claude Code"
+      },
+      {
+        "command": "powerquery-lint.disableClaudeCode",
+        "title": "Power Query: Remove from Claude Code"
       }
     ],
     "languages": [
@@ -77,6 +85,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable/disable Power Query linting"
+        },
+        "powerQueryLint.claudeCode.promptOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Offer once to provide Power Query Lint agents and skills to Claude Code when Claude Code is detected."
         }
       }
     }

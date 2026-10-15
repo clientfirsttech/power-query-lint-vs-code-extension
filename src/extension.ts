@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { registerClaudeCodeSupport } from './claudeCode';
 
 /**
  * Activates the Power Query Lint extension
@@ -40,6 +41,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Ensure required settings are configured
   configureMcpSettings();
+
+  // Opt-in: offer to provide the agents and skills to Claude Code
+  registerClaudeCodeSupport(context);
 }
 
 /**

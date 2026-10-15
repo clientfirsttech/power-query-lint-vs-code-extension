@@ -23,11 +23,18 @@ code --install-extension ClientFirstTechnologies.power-query-lint
 
 ### Claude Code
 
-The same agents and skills are available in [Claude Code](https://claude.com/claude-code) as the `power-query-lint` plugin. Clone this repository and load it for a session:
+The same agents and skills are available in [Claude Code](https://claude.com/claude-code) as the `power-query-lint` plugin. It is opt-in: when this extension detects Claude Code it asks once whether to enable it, and you can choose **Enable**, **Not now**, or **Don't ask again**. Nothing in your Claude Code settings changes unless you choose Enable.
+
+You can also run **Power Query: Enable for Claude Code** or **Power Query: Remove from Claude Code** from the Command Palette at any time, or turn the one-time prompt off with the `powerQueryLint.claudeCode.promptOnStartup` setting. After you enable it, the extension keeps the plugin pointed at the installed extension version when the extension updates. Start a new Claude Code session to pick up changes.
+
+If Claude Code's command line isn't found, the extension shows the two commands to run yourself:
 
 ```bash
-claude --plugin-dir ./power-query-lint-vs-code-extension
+claude plugin marketplace add "<extension folder>" --scope user
+claude plugin install power-query-lint@power-query-lint-extension --scope user
 ```
+
+To try the plugin from a clone of this repository for a single session instead, run `claude --plugin-dir .` from the repository root.
 
 The plugin provides the `pql-linter` and `pql-tester` agents, the `pql-assert`, `pql-test`, and `semantic-model-authoring` skills, and the `powerbi-modeling-mcp` and `pqlint-mcp` MCP servers. Before linting, set your Power Query Lint subscription key in the environment Claude Code runs in:
 

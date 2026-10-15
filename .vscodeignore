@@ -18,6 +18,4 @@ CONTRIBUTING.md
 package-lock.json
 scripts/**
 .versionrc.json
-.claude-plugin/**
 agent-src/**
-agents/**

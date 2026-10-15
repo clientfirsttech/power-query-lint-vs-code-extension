@@ -414,9 +414,13 @@ Done: `plugin.json`, all four agent files, both skills, `package.json` and the l
 - Add `.claude-plugin/plugin.json` to `.versionrc.json` `bumpFiles` so `npm run release` keeps every version in step, including the new Claude manifests.
 - Add a CI check that `package.json`, plugin manifest, skill, and agent versions all match, and run `claude plugin validate . --strict`.
 
+#### 5b. Opt-in Claude Code registration from the extension — DONE 2026-10-15
+
+Decision: opt-in with a choice. On first activation, if Claude Code is detected, the extension asks once (Enable / Not now / Don't ask again). Commands `Power Query: Enable for Claude Code` and `Power Query: Remove from Claude Code`; setting `powerQueryLint.claudeCode.promptOnStartup`. Implementation: `src/claudeCli.ts` (CLI logic, no vscode import) and `src/claudeCode.ts` (prompt, commands, refresh-after-consent). Mechanism: a local-only marketplace (`.claude-plugin/marketplace.json`, name `power-query-lint-extension`) pointing at the extension folder, registered with `claude plugin marketplace add <extensionPath> --scope user` and `claude plugin install power-query-lint@power-query-lint-extension --scope user`. After consent, activation silently re-points and updates the plugin when the extension version or folder changes. The CLI is the Claude Code VS Code extension's bundled binary, else `claude` on PATH, else the user is shown the two commands. Tested with the real CLI in an isolated `CLAUDE_CONFIG_DIR`: enable, idempotent re-enable, upgrade (new folder + version), disable. Not yet exercised: the VS Code prompt UI itself (needs Task 8).
+
 #### 8. Validation (manual, since the repo has no automated tests)
 
-- Claude Code: `claude --plugin-dir .` loads; `/agents` lists `pql-tester` and `pql-linter`; `/skills` lists `pql-assert`, `pql-test`, `semantic-model-authoring`; run a discovery request end to end against `examples/`; confirm both MCP servers connect.
+- Claude Code, via the extension: on first activation the prompt appears when Claude Code is installed; choose Enable and confirm `claude plugin list` shows `power-query-lint@power-query-lint-extension`; also check Not now / Don't ask again behave, and that `Power Query: Remove from Claude Code` removes it. Developer shortcut: `claude --plugin-dir .` loads; `/agents` lists `pql-tester` and `pql-linter`; `/skills` lists `pql-assert`, `pql-test`, `semantic-model-authoring`; run a discovery request end to end against `examples/`; confirm both MCP servers connect.
 - Copilot: Ctrl+F5 Development Host shows the same agents and skills; same end-to-end request.
 - Install on a clean machine/profile in each tool; confirm the `version:` frontmatter matches the extension version.
 
