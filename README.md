@@ -6,7 +6,6 @@ Visual Studio Code Extension for Power Query linting and analysis with Model Con
 
 - **Power Query Linting** — Lint `.pq` and `.pqm` files for best practice violations and potential issues
 - **Workspace Linting** — Lint all Power Query files across the entire workspace in one command
-- **Language Support** — Syntax highlighting and language configuration for Power Query M
 - **MCP Integration** — Model Context Protocol support for AI agent workflows
 - **Copilot Agents** — Built-in GitHub Copilot agents for linting (`PQL - Linter`) and semantic model testing (`PQL - Tester`)
 - **Copilot Skills** — Agent skills for PQL.Assert documentation and DAX query guidelines
